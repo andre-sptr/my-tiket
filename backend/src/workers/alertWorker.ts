@@ -7,7 +7,10 @@ import { sendPushNotification } from '../services/webpush';
 import { formatIDR } from '../utils/format';
 
 const QUEUE_NAME = 'price-checker';
-const CHECK_INTERVAL_MS = 30 * 60 * 1000; // 30 menit
+// VPS resource-constrained: cek tiap 2 jam (sebelumnya 30 menit)
+// Bisa di-override via env CHECK_INTERVAL_MIN
+const CHECK_INTERVAL_MS =
+  Number(process.env.CHECK_INTERVAL_MIN || 120) * 60 * 1000;
 
 let queue: Queue;
 
@@ -145,7 +148,7 @@ export function startAlertWorker() {
   worker.on('error', (err) => console.error('[AlertWorker] Worker error:', err));
   worker.on('failed', (job, err) => console.error(`[AlertWorker] Job ${job?.id} failed:`, err));
 
-  console.log('✅ Alert worker started (checks every 30 min)');
+  console.log(`✅ Alert worker started (checks every ${CHECK_INTERVAL_MS / 60000} min)`);
 }
 
 async function triggerAlert(prisma: PrismaClient, alert: any, price: number) {

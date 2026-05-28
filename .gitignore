@@ -1,3 +1,17 @@
 frontend/node_modules/
-frontend/node_modules/
 backend/node_modules/
+
+# Next.js build artifacts
+frontend/.next/
+
+# Backend build output
+backend/dist/
+
+# PM2 runtime logs
+logs/
+frontend/logs/
+
+# Env files
+.env
+.env.prod
+.env.local
