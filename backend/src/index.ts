@@ -46,7 +46,7 @@ async function bootstrap() {
 
   const port = Number(process.env.PORT || 4000);
   await log.listen({ port, host: '0.0.0.0' });
-  log.log.info(`🚀 Backend running on http://0.0.0.0:${port}`);
+  log.log.info(`Backend running on http://0.0.0.0:${port}`);
 }
 
 bootstrap().catch((err) => {

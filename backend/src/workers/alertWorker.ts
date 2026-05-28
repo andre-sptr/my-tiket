@@ -1,7 +1,7 @@
 import { Queue, Worker, type Job } from 'bullmq';
 import { Redis } from 'ioredis';
 import { PrismaClient } from '@prisma/client';
-import { AmadeusService } from '../services/amadeus';
+import { DuffelService } from '../services/duffel';
 import { ScraperService } from '../services/scraper/index';
 import { sendPushNotification } from '../services/webpush';
 import { formatIDR } from '../utils/format';
@@ -20,7 +20,7 @@ export function startAlertWorker() {
   });
 
   const prisma = new PrismaClient();
-  const amadeusService = new AmadeusService(redis);
+  const duffelService = new DuffelService(redis);
   const scraperService = new ScraperService(redis);
 
   queue = new Queue(QUEUE_NAME, { connection: redis });
@@ -67,15 +67,15 @@ export function startAlertWorker() {
       // Tentukan sumber per maskapai di grup ini
       const airlineCodes = [...new Set(groupAlerts.map((a) => a.airlineCode).filter(Boolean) as string[])];
       const lccCodes = airlineCodes.filter((c) => ['JT', 'QG', 'QZ', 'IU'].includes(c));
-      const gdsAirlines = airlineCodes.filter((c) => !['JT', 'QG', 'QZ', 'IU'].includes(c));
+      const fullServiceAirlines = airlineCodes.filter((c) => !['JT', 'QG', 'QZ', 'IU'].includes(c));
 
       // Fetch current prices
       const currentPrices = new Map<string, number>(); // airlineCode → lowestPrice
 
-      // Amadeus (full-service)
-      if (gdsAirlines.length > 0 || airlineCodes.length === 0) {
+      // Duffel (full-service)
+      if (fullServiceAirlines.length > 0 || airlineCodes.length === 0) {
         try {
-          const offers = await amadeusService.searchFlights({
+          const offers = await duffelService.searchFlights({
             origin: representative.origin,
             destination: representative.destination,
             date: dateStr,
@@ -89,9 +89,9 @@ export function startAlertWorker() {
             }
           }
         } catch (err) {
-          console.warn('[AlertWorker] Amadeus fetch error:', (err as Error).message);
+          console.warn('[AlertWorker] Duffel fetch error:', (err as Error).message);
         }
-        await sleep(200); // rate limiting Amadeus
+        await sleep(300); // rate limiting Duffel
       }
 
       // LCC scrapers
@@ -172,7 +172,7 @@ async function triggerAlert(prisma: PrismaClient, alert: any, price: number) {
   await prisma.notificationLog.create({
     data: {
       alertId: alert.id,
-      source: alert.airlineCode ? mapSource(alert.airlineCode) : 'AMADEUS',
+      source: alert.airlineCode ? mapSource(alert.airlineCode) : 'DUFFEL',
       priceTriggered: BigInt(price),
       success,
     },
@@ -200,9 +200,9 @@ function formatDate(date: Date): string {
   return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function mapSource(code: string): 'AMADEUS' | 'LIONAIR' | 'CITILINK' | 'AIRASIA' | 'SUPERAIRJET' {
+function mapSource(code: string): 'DUFFEL' | 'LIONAIR' | 'CITILINK' | 'AIRASIA' | 'SUPERAIRJET' {
   const map: Record<string, any> = { JT: 'LIONAIR', QG: 'CITILINK', QZ: 'AIRASIA', IU: 'SUPERAIRJET' };
-  return map[code] || 'AMADEUS';
+  return map[code] || 'DUFFEL';
 }
 
 // dummy import untuk webpush (resolved di runtime)

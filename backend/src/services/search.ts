@@ -1,14 +1,14 @@
 /**
- * UnifiedSearchService — koordinasi Amadeus + Scraper
+ * UnifiedSearchService — koordinasi Duffel + Scraper
  */
 import type { PrismaClient } from '@prisma/client';
 import type { Redis } from 'ioredis';
-import { AmadeusService } from './amadeus';
+import { DuffelService } from './duffel';
 import { ScraperService } from './scraper/index';
 import type { FlightOffer, SearchParams } from './types';
 
-// Maskapai yang tersedia di Amadeus GDS
-const AMADEUS_AIRLINES = new Set([
+// Maskapai full-service / GDS yang umumnya tersedia lewat Duffel
+const DUFFEL_AIRLINES = new Set([
   'GA', 'ID', 'SJ', 'SQ', 'MH', 'TG', 'CX', 'EK', 'QR',
   'KL', 'LH', 'BA', 'AF', 'JL', '5J', 'PR', 'VN', 'CI',
 ]);
@@ -17,12 +17,12 @@ const AMADEUS_AIRLINES = new Set([
 const LCC_AIRLINES = new Set(['JT', 'QG', 'QZ', 'IU']);
 
 export class UnifiedSearchService {
-  private amadeus: AmadeusService;
+  private duffel: DuffelService;
   private scraper: ScraperService;
   private prisma: PrismaClient;
 
   constructor(prisma: PrismaClient, redis: Redis) {
-    this.amadeus = new AmadeusService(redis);
+    this.duffel = new DuffelService(redis);
     this.scraper = new ScraperService(redis);
     this.prisma = prisma;
   }
@@ -35,8 +35,8 @@ export class UnifiedSearchService {
   }> {
     const requestedAirlines = params.airlines?.split(',').map((a) => a.trim().toUpperCase());
 
-    // Tentukan mana yang dari Amadeus, mana yang di-scrape
-    const useAmadeus = !requestedAirlines || requestedAirlines.some((a) => AMADEUS_AIRLINES.has(a)) || requestedAirlines.length === 0;
+    // Tentukan mana yang dari Duffel, mana yang di-scrape
+    const useDuffel = !requestedAirlines || requestedAirlines.some((a) => DUFFEL_AIRLINES.has(a)) || requestedAirlines.length === 0;
     const lccToScrape = requestedAirlines
       ? requestedAirlines.filter((a) => LCC_AIRLINES.has(a))
       : Array.from(LCC_AIRLINES);
@@ -44,14 +44,14 @@ export class UnifiedSearchService {
     const tasks: Promise<FlightOffer[]>[] = [];
     const sources: string[] = [];
 
-    if (useAmadeus) {
+    if (useDuffel) {
       tasks.push(
-        this.amadeus.searchFlights(params).catch((err) => {
-          console.warn('[Search] Amadeus failed:', err.message);
+        this.duffel.searchFlights(params).catch((err) => {
+          console.warn('[Search] Duffel failed:', err.message);
           return [];
         })
       );
-      sources.push('AMADEUS');
+      sources.push('DUFFEL');
     }
 
     if (lccToScrape.length > 0) {

@@ -1,0 +1,16 @@
+{
+  "name": "myTiket — Pantau Harga Tiket Pesawat",
+  "short_name": "myTiket",
+  "description": "Monitor harga tiket pesawat dari semua maskapai. Set alert harga dan dapatkan notifikasi saat harga turun.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0ea5e9",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ]
+}

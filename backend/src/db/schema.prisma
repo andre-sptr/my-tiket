@@ -8,7 +8,8 @@ datasource db {
 }
 
 enum FlightSource {
-  AMADEUS
+  DUFFEL
+  AMADEUS   // deprecated, dipertahankan utk historical price records
   LIONAIR
   CITILINK
   AIRASIA

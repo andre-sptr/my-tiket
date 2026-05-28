@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { UnifiedSearchService } from '../services/search';
-import { AmadeusService } from '../services/amadeus';
+import { DuffelService } from '../services/duffel';
 
 const SearchQuerySchema = z.object({
   origin: z.string().length(3).toUpperCase(),
@@ -32,8 +32,8 @@ export const flightsRouter: FastifyPluginAsync = async (fastify) => {
     if (!keyword || keyword.length < 2) {
       return reply.status(400).send({ message: 'keyword minimal 2 karakter' });
     }
-    const amadeus = new AmadeusService(fastify.redis);
-    return amadeus.searchAirports(keyword);
+    const duffel = new DuffelService(fastify.redis);
+    return duffel.searchAirports(keyword);
   });
 
   // GET /api/flights/history?origin=CGK&destination=SIN&date=2024-12-01&airline=GA
@@ -63,22 +63,26 @@ export const flightsRouter: FastifyPluginAsync = async (fastify) => {
   });
 
   // GET /api/flights/cheapest-dates?origin=CGK&destination=SIN
+  // NOTE: Duffel tidak punya endpoint ini → return []. Implementasi alternatif:
+  // sample harga lintas tanggal lewat searchFlights (mahal API call) ATAU ambil
+  // dari priceRecord historis.
   fastify.get('/flights/cheapest-dates', async (req, reply) => {
     const { origin, destination } = req.query as { origin?: string; destination?: string };
     if (!origin || !destination) {
       return reply.status(400).send({ message: 'origin dan destination required' });
     }
-    const amadeus = new AmadeusService(fastify.redis);
-    return amadeus.getCheapestDates(origin.toUpperCase(), destination.toUpperCase());
+    const duffel = new DuffelService(fastify.redis);
+    return duffel.getCheapestDates(origin.toUpperCase(), destination.toUpperCase());
   });
 
   // GET /api/flights/inspiration?origin=CGK
+  // NOTE: Duffel tidak punya endpoint ini → return []. Pertimbangkan curated list di frontend.
   fastify.get('/flights/inspiration', async (req, reply) => {
     const { origin } = req.query as { origin?: string };
     if (!origin) {
       return reply.status(400).send({ message: 'origin required' });
     }
-    const amadeus = new AmadeusService(fastify.redis);
-    return amadeus.getInspiration(origin.toUpperCase());
+    const duffel = new DuffelService(fastify.redis);
+    return duffel.getInspiration(origin.toUpperCase());
   });
 };
