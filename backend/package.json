@@ -12,6 +12,9 @@
     "db:studio": "prisma studio",
     "vapid:generate": "tsx scripts/generate-vapid.ts"
   },
+  "prisma": {
+    "schema": "src/db/schema.prisma"
+  },
   "dependencies": {
     "fastify": "^4.27.0",
     "@fastify/cors": "^9.0.1",

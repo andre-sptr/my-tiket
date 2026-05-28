@@ -19,8 +19,8 @@
 
 ### 1. Setup environment
 ```bash
-cp .env.example .env
-# Edit .env: isi AMADEUS_CLIENT_ID, AMADEUS_CLIENT_SECRET
+cp backend/.env.example backend/.env
+# Edit backend/.env: isi AMADEUS_CLIENT_ID (opsional), DATABASE_URL, REDIS_URL
 ```
 
 ### 2. Pastikan Postgres + Redis jalan
@@ -141,8 +141,8 @@ bash deploy.sh first-run
 sudo -u postgres psql -c "ALTER USER mytiket WITH PASSWORD 'GANTI_PASSWORD_KUAT';"
 
 # Isi env
-cp .env.example .env.prod
-nano .env.prod   # update DATABASE_URL password sesuai di atas
+cp backend/.env.example backend/.env.prod
+nano backend/.env.prod   # update DATABASE_URL password sesuai di atas
 
 # Setup nginx vhost lewat aaPanel:
 #   1. Add Site: tiket.andresptr.site

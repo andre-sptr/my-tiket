@@ -99,7 +99,7 @@ SQL
     echo "   1. Edit /etc/postgresql/16/main/pg_hba.conf jika butuh remote access"
     echo "   2. Ganti password DB:"
     echo "      sudo -u postgres psql -c \"ALTER USER mytiket WITH PASSWORD 'PASSWORD_BARU';\""
-    echo "   3. Copy .env.example → .env.prod dan isi semua nilai"
+    echo "   3. Copy backend/.env.example → backend/.env.prod dan isi semua nilai"
     echo "   4. Tambahkan vhost di aaPanel pakai nginx/nginx.aapanel.conf"
     echo "   5. Jalankan: bash deploy.sh"
     exit 0

@@ -11,7 +11,10 @@ backend/dist/
 logs/
 frontend/logs/
 
-# Env files
+# Env files (di mana saja)
 .env
 .env.prod
 .env.local
+**/.env
+**/.env.prod
+**/.env.local
