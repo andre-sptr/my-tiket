@@ -1,0 +1,89 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum FlightSource {
+  AMADEUS
+  LIONAIR
+  CITILINK
+  AIRASIA
+  SUPERAIRJET
+}
+
+enum CabinClass {
+  ECONOMY
+  PREMIUM_ECONOMY
+  BUSINESS
+  FIRST
+}
+
+model PriceRecord {
+  id           String       @id @default(uuid())
+  source       FlightSource
+  origin       String       @db.VarChar(3)
+  destination  String       @db.VarChar(3)
+  date         DateTime     @db.Date
+  airlineCode  String?      @db.VarChar(10)
+  flightNumber String?      @db.VarChar(10)
+  cabinClass   CabinClass   @default(ECONOMY)
+  departureAt  DateTime?
+  arrivalAt    DateTime?
+  durationMin  Int?
+  stops        Int          @default(0)
+  priceIdr     BigInt
+  baggage      String?
+  bookingUrl   String?
+  scrapedAt    DateTime     @default(now())
+  rawData      Json?
+
+  @@index([origin, destination, date, airlineCode])
+  @@index([scrapedAt(sort: Desc)])
+  @@map("price_records")
+}
+
+model Alert {
+  id               String       @id @default(uuid())
+  // Target flight criteria
+  origin           String       @db.VarChar(3)
+  destination      String       @db.VarChar(3)
+  departureDate    DateTime     @db.Date
+  airlineCode      String?      @db.VarChar(10)  // null = semua maskapai
+  flightNumber     String?      @db.VarChar(10)  // null = semua flight
+  cabinClass       CabinClass   @default(ECONOMY)
+  // Threshold
+  thresholdPrice   BigInt
+  // Push
+  pushSubscription Json         // browser PushSubscription JSON
+  clientId         String       @db.VarChar(64)
+  // Status
+  isActive         Boolean      @default(true)
+  lastCheckedAt    DateTime?
+  lastPriceSeen    BigInt?
+  triggeredAt      DateTime?
+  createdAt        DateTime     @default(now())
+
+  notifications    NotificationLog[]
+
+  @@index([isActive, departureDate])
+  @@index([clientId])
+  @@map("alerts")
+}
+
+model NotificationLog {
+  id             String       @id @default(uuid())
+  alert          Alert        @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  alertId        String
+  source         FlightSource
+  priceTriggered BigInt
+  flightNumber   String?
+  success        Boolean
+  errorMessage   String?
+  sentAt         DateTime     @default(now())
+
+  @@map("notification_logs")
+}

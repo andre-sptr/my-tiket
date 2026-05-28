@@ -1,0 +1,43 @@
+{
+  "name": "mytiket-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "14.2.3",
+    "react": "^18",
+    "react-dom": "^18",
+    "@tanstack/react-query": "^5.40.0",
+    "@tanstack/react-query-devtools": "^5.40.0",
+    "recharts": "^2.12.7",
+    "date-fns": "^3.6.0",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.3.0",
+    "lucide-react": "^0.394.0",
+    "sonner": "^1.5.0",
+    "@radix-ui/react-dialog": "^1.1.1",
+    "@radix-ui/react-select": "^2.1.1",
+    "@radix-ui/react-popover": "^1.1.1",
+    "@radix-ui/react-separator": "^1.1.0",
+    "@radix-ui/react-slot": "^1.1.0",
+    "@radix-ui/react-label": "^2.1.0",
+    "class-variance-authority": "^0.7.0"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "tailwindcss": "^3.4.1",
+    "autoprefixer": "^10.0.1",
+    "postcss": "^8",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.3"
+  }
+}
