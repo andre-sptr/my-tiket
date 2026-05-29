@@ -15,9 +15,9 @@ interface Props {
   isLoading: boolean;
 }
 
-const chipCls = 'px-3 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer';
-const activeChip = 'bg-brand-600 text-white border-brand-600';
-const inactiveChip = 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-brand-400';
+const chipBase   = 'rounded-full border px-3.5 py-1.5 font-mono text-[10px] uppercase tracking-widest transition-all cursor-pointer';
+const chipActive = 'border-midnight-700 bg-midnight-700 text-cream-50';
+const chipIdle   = 'border-midnight-700/15 bg-transparent text-ink-500 hover:border-midnight-700/50 hover:text-midnight-700';
 
 export default function FilterBar({
   airlines, filterAirlines, onFilterAirlines,
@@ -34,46 +34,63 @@ export default function FilterBar({
   }
 
   return (
-    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 space-y-3">
+    <div className="pass-card space-y-5 p-5 sm:p-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-          <SlidersHorizontal className="w-4 h-4" />
-          Filter & Urutkan
+        <div className="flex items-center gap-2.5">
+          <SlidersHorizontal className="h-3.5 w-3.5 text-amber-500" />
+          <span className="font-mono text-[10px] uppercase tracking-widest text-ink-500">
+            Filter &amp; Urutkan
+          </span>
         </div>
         {!isLoading && (
-          <span className="text-xs text-gray-400">{totalResults} penerbangan</span>
+          <span className="font-display text-sm italic text-ink-400">
+            {totalResults} pilihan ditemukan
+          </span>
         )}
       </div>
 
-      {/* Sort */}
-      <div className="flex gap-2 flex-wrap">
-        <span className="text-xs text-gray-400 self-center mr-1">Urutkan:</span>
+      <Row label="Urutkan">
         {(['price', 'duration', 'departure'] as const).map((s) => (
-          <button key={s} onClick={() => onSortBy(s)} className={clsx(chipCls, sortBy === s ? activeChip : inactiveChip)}>
-            {s === 'price' ? 'Harga Termurah' : s === 'duration' ? 'Tercepat' : 'Keberangkatan'}
+          <button
+            key={s}
+            onClick={() => onSortBy(s)}
+            className={clsx(chipBase, sortBy === s ? chipActive : chipIdle)}
+          >
+            {s === 'price' ? 'Termurah' : s === 'duration' ? 'Tercepat' : 'Keberangkatan'}
           </button>
         ))}
-      </div>
+      </Row>
 
-      {/* Stops */}
-      <div className="flex gap-2 flex-wrap">
-        <span className="text-xs text-gray-400 self-center mr-1">Transit:</span>
-        <button onClick={() => onFilterStops(null)} className={clsx(chipCls, filterStops === null ? activeChip : inactiveChip)}>Semua</button>
-        <button onClick={() => onFilterStops(0)} className={clsx(chipCls, filterStops === 0 ? activeChip : inactiveChip)}>Langsung</button>
-        <button onClick={() => onFilterStops(1)} className={clsx(chipCls, filterStops === 1 ? activeChip : inactiveChip)}>1 Transit</button>
-      </div>
+      <Row label="Transit">
+        <button onClick={() => onFilterStops(null)} className={clsx(chipBase, filterStops === null ? chipActive : chipIdle)}>Semua</button>
+        <button onClick={() => onFilterStops(0)}    className={clsx(chipBase, filterStops === 0    ? chipActive : chipIdle)}>Langsung</button>
+        <button onClick={() => onFilterStops(1)}    className={clsx(chipBase, filterStops === 1    ? chipActive : chipIdle)}>1 Transit</button>
+      </Row>
 
-      {/* Airlines */}
       {airlines.length > 0 && (
-        <div className="flex gap-2 flex-wrap">
-          <span className="text-xs text-gray-400 self-center mr-1">Maskapai:</span>
+        <Row label="Maskapai">
           {airlines.map((code) => (
-            <button key={code} onClick={() => toggleAirline(code)} className={clsx(chipCls, filterAirlines.includes(code) ? activeChip : inactiveChip)}>
+            <button
+              key={code}
+              onClick={() => toggleAirline(code)}
+              className={clsx(chipBase, filterAirlines.includes(code) ? chipActive : chipIdle)}
+            >
               {code}
             </button>
           ))}
-        </div>
+        </Row>
       )}
+    </div>
+  );
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="mr-2 min-w-[60px] font-mono text-[9px] uppercase tracking-widest text-ink-400">
+        {label}
+      </span>
+      {children}
     </div>
   );
 }

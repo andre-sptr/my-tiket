@@ -6,7 +6,7 @@ import { getClientId } from '@/lib/localStorage';
 import { fetchAlerts, deleteAlert } from '@/lib/api';
 import AlertList from '@/components/AlertList';
 import AlertModal from '@/components/AlertModal';
-import { Bell, BellOff, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import type { Alert } from '@/lib/types';
 
 export default function AlertsPage() {
@@ -20,8 +20,8 @@ export default function AlertsPage() {
 
   const { data: alerts = [], isLoading } = useQuery({
     queryKey: ['alerts', clientId],
-    queryFn: () => fetchAlerts(clientId),
-    enabled: !!clientId,
+    queryFn:  () => fetchAlerts(clientId),
+    enabled:  !!clientId,
   });
 
   const deleteMutation = useMutation({
@@ -31,48 +31,57 @@ export default function AlertsPage() {
     },
   });
 
-  const activeAlerts = alerts.filter((a: Alert) => a.isActive);
+  const activeAlerts    = alerts.filter((a: Alert) => a.isActive);
   const triggeredAlerts = alerts.filter((a: Alert) => !a.isActive && a.triggeredAt);
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
-          <Bell className="w-6 h-6 text-brand-500" />
-          <h1 className="text-2xl font-bold">Alert Saya</h1>
+    <div className="mx-auto max-w-3xl space-y-10">
+      {/* Header */}
+      <header className="flex flex-wrap items-end justify-between gap-6 border-b border-midnight-700/10 pb-6">
+        <div>
+          <p className="eyebrow mb-2">Dashboard Pribadi</p>
+          <h1 className="font-display text-[clamp(2.4rem,6vw,4rem)] font-light leading-[0.95] tracking-tightest text-midnight-700">
+            Alert <span className="italic text-amber-500">Saya</span>
+          </h1>
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="inline-flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-lg px-4 py-2 text-sm transition-colors"
+          className="btn-primary"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="h-3.5 w-3.5" />
           Buat Alert Baru
         </button>
-      </div>
+      </header>
 
       {isLoading && (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-24 bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse" />
+            <div key={i} className="pass-card h-32 animate-pulse" />
           ))}
         </div>
       )}
 
       {!isLoading && alerts.length === 0 && (
-        <div className="text-center py-20 space-y-3">
-          <BellOff className="w-12 h-12 mx-auto text-gray-300" />
-          <p className="text-gray-400">Belum ada alert aktif.</p>
-          <p className="text-sm text-gray-400">
-            Klik <strong>"Buat Alert Baru"</strong> di atas untuk mulai memantau harga.
+        <div className="pass-card flex flex-col items-center gap-3 px-6 py-16 text-center">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-ink-400">
+            Belum ada sinyal
+          </p>
+          <p className="font-display text-2xl italic text-midnight-700">
+            Sunyi di sini.
+          </p>
+          <p className="max-w-sm font-mono text-[10px] uppercase tracking-widest text-ink-400">
+            Klik "Buat Alert Baru" untuk mulai memantau harga
           </p>
         </div>
       )}
 
       {activeAlerts.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block" />
-            Sedang Dipantau ({activeAlerts.length})
+          <h2 className="mb-4 flex items-center gap-3">
+            <span className="block h-2 w-2 animate-pulse-soft rounded-full bg-amber-400" />
+            <span className="font-mono text-[10px] uppercase tracking-widest text-ink-500">
+              Sedang Dipantau ({activeAlerts.length})
+            </span>
           </h2>
           <AlertList alerts={activeAlerts} onDelete={(id) => deleteMutation.mutate(id)} />
         </section>
@@ -80,8 +89,11 @@ export default function AlertsPage() {
 
       {triggeredAlerts.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold mb-3 text-gray-500">
-            ✅ Sudah Terpicu ({triggeredAlerts.length})
+          <h2 className="mb-4 flex items-center gap-3">
+            <span className="block h-2 w-2 rounded-full bg-emerald-500" />
+            <span className="font-mono text-[10px] uppercase tracking-widest text-ink-500">
+              Sudah Terpicu ({triggeredAlerts.length})
+            </span>
           </h2>
           <AlertList
             alerts={triggeredAlerts}
@@ -91,8 +103,8 @@ export default function AlertsPage() {
         </section>
       )}
 
-      <p className="text-xs text-gray-400 text-center">
-        Notifikasi dikirim via WhatsApp ke nomor yang Anda daftarkan saat membuat alert.
+      <p className="border-t border-dashed border-midnight-700/15 pt-5 text-center font-mono text-[10px] uppercase tracking-widest text-ink-400">
+        ✦ Notifikasi dikirim via WhatsApp ke nomor yang Anda daftarkan
       </p>
 
       {showCreate && <AlertModal onClose={() => setShowCreate(false)} />}

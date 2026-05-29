@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Bell, Loader2, CheckCircle2, MessageCircle } from 'lucide-react';
+import { X, Loader2, CheckCircle2 } from 'lucide-react';
 import { createAlert } from '@/lib/api';
 import { getClientId, addAlertId } from '@/lib/localStorage';
 import { formatIDR } from '@/lib/format';
@@ -9,10 +9,8 @@ import type { CabinClass, FlightOffer, SearchParams } from '@/lib/types';
 import { toast } from 'sonner';
 
 interface Props {
-  /** Optional prefill dari flight card */
   flight?: FlightOffer;
   searchParams?: SearchParams;
-  /** Optional default origin/destination kalau dibuka dari halaman alerts */
   defaultOrigin?: string;
   defaultDestination?: string;
   onClose: () => void;
@@ -87,7 +85,7 @@ export default function AlertModal({
 
       addAlertId(alert.id);
       setStatus('success');
-      toast.success(`Alert aktif! Notif WhatsApp akan dikirim saat harga ≤ ${formatIDR(maxPrice)}.`);
+      toast.success(`Alert aktif! Notif WhatsApp dikirim saat harga ≤ ${formatIDR(maxPrice)}.`);
       setTimeout(onClose, 1800);
     } catch (err) {
       toast.error(`Gagal membuat alert: ${(err as Error).message}`);
@@ -95,55 +93,65 @@ export default function AlertModal({
     }
   }
 
+  const labelCls = 'font-mono text-[10px] uppercase tracking-widest text-ink-400';
+  const inputCls = 'mt-1.5 w-full rounded-lg border border-midnight-700/15 bg-cream-100/60 px-3 py-2.5 font-display text-base text-midnight-700 placeholder:text-ink-400/55 placeholder:italic focus:border-amber-400 focus:bg-cream-50 focus:outline-none focus:ring-2 focus:ring-amber-400/30';
+  const monoInput = 'mt-1.5 w-full rounded-lg border border-midnight-700/15 bg-cream-100/60 px-3 py-2.5 font-mono text-sm uppercase tracking-wider text-midnight-700 placeholder:text-ink-400/55 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30';
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md border border-gray-200 dark:border-gray-800 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900">
-          <div className="flex items-center gap-2">
-            <Bell className="w-5 h-5 text-brand-500" />
-            <h2 className="font-semibold text-lg">Set Alert Harga</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-midnight-700/55 backdrop-blur-sm animate-fade-in">
+      <div className="pass-card max-h-[90vh] w-full max-w-md overflow-y-auto bg-cream-50">
+        {/* Header */}
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-midnight-700/10 bg-cream-50/95 px-6 py-5 backdrop-blur">
+          <div>
+            <p className={labelCls}>№ 01 · Sinyal Harga</p>
+            <h2 className="mt-1 font-display text-2xl font-light italic tracking-tight text-midnight-700">
+              Set Alert
+            </h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+            className="rounded-full p-1.5 text-ink-400 transition-colors hover:bg-midnight-700/5 hover:text-midnight-700"
+            aria-label="Tutup"
           >
-            <X className="w-5 h-5" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
         {status === 'success' ? (
-          <div className="p-10 flex flex-col items-center gap-3 text-center">
-            <CheckCircle2 className="w-14 h-14 text-green-500" />
-            <p className="font-semibold text-lg">Alert Aktif!</p>
-            <p className="text-sm text-gray-400">
-              Notifikasi WhatsApp akan dikirim ke {phoneNumber} saat harga tercapai.
+          <div className="flex flex-col items-center gap-4 px-6 py-12 text-center animate-fade-up">
+            <div className="rounded-full bg-emerald-100 p-4">
+              <CheckCircle2 className="h-10 w-10 text-emerald-600" />
+            </div>
+            <p className="font-display text-2xl italic text-midnight-700">Alert aktif.</p>
+            <p className="font-mono text-[11px] uppercase tracking-widest text-ink-400">
+              Sinyal akan dikirim ke {phoneNumber}
             </p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="p-5 space-y-4">
-            {/* Origin & Destination */}
+          <form onSubmit={handleSubmit} className="space-y-5 px-6 py-6">
+            {/* Origin / Destination */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium mb-1 text-gray-500">Dari (IATA)</label>
+                <label className={labelCls}>Dari (IATA)</label>
                 <input
                   type="text"
                   value={origin}
                   onChange={(e) => setOrigin(e.target.value.toUpperCase().slice(0, 3))}
                   placeholder="CGK"
                   maxLength={3}
-                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className={monoInput}
                   required
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium mb-1 text-gray-500">Tujuan (IATA)</label>
+                <label className={labelCls}>Tujuan (IATA)</label>
                 <input
                   type="text"
                   value={destination}
                   onChange={(e) => setDestination(e.target.value.toUpperCase().slice(0, 3))}
                   placeholder="DPS"
                   maxLength={3}
-                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className={monoInput}
                   required
                 />
               </div>
@@ -152,24 +160,24 @@ export default function AlertModal({
             {/* Date range */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium mb-1 text-gray-500">Berangkat dari</label>
+                <label className={labelCls}>Berangkat dari</label>
                 <input
                   type="date"
                   value={dateFrom}
                   min={today}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className={inputCls}
                   required
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium mb-1 text-gray-500">Sampai</label>
+                <label className={labelCls}>Sampai</label>
                 <input
                   type="date"
                   value={dateTo}
                   min={dateFrom}
                   onChange={(e) => setDateTo(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className={inputCls}
                   required
                 />
               </div>
@@ -178,11 +186,11 @@ export default function AlertModal({
             {/* Cabin & Airline */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium mb-1 text-gray-500">Kelas</label>
+                <label className={labelCls}>Kelas</label>
                 <select
                   value={cabinClass}
                   onChange={(e) => setCabinClass(e.target.value as CabinClass)}
-                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className={inputCls}
                 >
                   {CABIN_CLASSES.map((c) => (
                     <option key={c} value={c}>
@@ -192,46 +200,41 @@ export default function AlertModal({
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium mb-1 text-gray-500">
-                  Maskapai <span className="text-gray-400">(opsional)</span>
+                <label className={labelCls}>
+                  Maskapai <span className="normal-case text-ink-400">(opsional)</span>
                 </label>
                 <input
                   type="text"
                   value={airlineCode}
                   onChange={(e) => setAirlineCode(e.target.value.toUpperCase().slice(0, 3))}
-                  placeholder="GA, JT, …"
+                  placeholder="GA"
                   maxLength={3}
-                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className={monoInput}
                 />
               </div>
             </div>
 
-            {/* Phone number */}
+            {/* Phone */}
             <div>
-              <label className="block text-xs font-medium mb-1 text-gray-500">
-                <MessageCircle className="w-3 h-3 inline mr-1" />
-                Nomor WhatsApp
-              </label>
+              <label className={labelCls}>Nomor WhatsApp</label>
               <input
                 type="tel"
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="08123xxxxxxx atau +628123xxxxxxx"
-                className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                placeholder="08123xxxxxxx"
+                className={inputCls}
                 required
               />
-              <p className="text-xs text-gray-400 mt-1">
-                Notifikasi akan dikirim via WhatsApp saat harga tercapai.
+              <p className="mt-1.5 font-mono text-[9px] uppercase tracking-widest text-ink-400">
+                Notifikasi akan dikirim ke nomor ini
               </p>
             </div>
 
             {/* Max price */}
             <div>
-              <label className="block text-xs font-medium mb-1 text-gray-500">
-                Beri tahu kalau harga ≤
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 font-medium">
+              <label className={labelCls}>Beri tahu kalau harga ≤</label>
+              <div className="relative mt-1.5">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-xs uppercase tracking-widest text-ink-400">
                   Rp
                 </span>
                 <input
@@ -240,26 +243,27 @@ export default function AlertModal({
                   onChange={(e) => setMaxPrice(Number(e.target.value))}
                   min={1}
                   step={50000}
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className="w-full rounded-lg border border-midnight-700/15 bg-cream-100/60 py-2.5 pl-10 pr-3 font-display text-base text-midnight-700 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30"
                   required
                 />
               </div>
-              <p className="text-xs text-gray-400 mt-1">{formatIDR(maxPrice)}</p>
+              <p className="mt-1.5 font-display text-sm italic text-amber-500">
+                ≈ {formatIDR(maxPrice)}
+              </p>
             </div>
 
             <button
               type="submit"
               disabled={status === 'loading'}
-              className="w-full bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white font-semibold rounded-lg py-2.5 flex items-center justify-center gap-2 transition-colors"
+              className="btn-primary w-full disabled:opacity-60"
             >
               {status === 'loading' ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Mengaktifkan…
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Mengaktifkan…
                 </>
               ) : (
-                <>
-                  <Bell className="w-4 h-4" /> Aktifkan Alert
-                </>
+                <>Aktifkan Alert</>
               )}
             </button>
           </form>

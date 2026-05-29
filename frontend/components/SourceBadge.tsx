@@ -2,20 +2,20 @@ import type { FlightSource } from '@/lib/types';
 import { clsx } from 'clsx';
 
 const SOURCE_META: Record<FlightSource, { label: string; color: string }> = {
-  DUFFEL: { label: 'Duffel', color: 'bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400' },
-  AMADEUS: { label: 'Amadeus GDS', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' },
-  LIONAIR: { label: 'Lion Air', color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400' },
-  CITILINK: { label: 'Citilink', color: 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' },
-  AIRASIA: { label: 'AirAsia', color: 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' },
-  SUPERAIRJET: { label: 'Super Air Jet', color: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' },
+  DUFFEL:      { label: 'Duffel',     color: 'border-sky-500 text-sky-500' },
+  AMADEUS:     { label: 'Amadeus',    color: 'border-blue-500 text-blue-500' },
+  LIONAIR:     { label: 'Lion Air',   color: 'border-orange-600 text-orange-600' },
+  CITILINK:    { label: 'Citilink',   color: 'border-emerald-600 text-emerald-600' },
+  AIRASIA:     { label: 'AirAsia',    color: 'border-red-600 text-red-600' },
+  SUPERAIRJET: { label: 'Super Jet',  color: 'border-purple-600 text-purple-600' },
 };
 
-const FALLBACK_META = { label: 'Unknown', color: 'bg-gray-100 dark:bg-gray-900/30 text-gray-600 dark:text-gray-400' };
+const FALLBACK = { label: 'Unknown', color: 'border-ink-400 text-ink-400' };
 
 export default function SourceBadge({ source }: { source: FlightSource }) {
-  const meta = SOURCE_META[source] || FALLBACK_META;
+  const meta = SOURCE_META[source] || FALLBACK;
   return (
-    <span className={clsx('text-xs font-medium px-2 py-0.5 rounded-full', meta.color)}>
+    <span className={clsx('stamp', meta.color)}>
       {meta.label}
     </span>
   );

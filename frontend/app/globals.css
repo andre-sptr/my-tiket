@@ -4,17 +4,160 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --cream: #F7F3EB;
+    --midnight: #0B1426;
+    --amber: #E8862A;
+    --sky: #5EC2D9;
+    --ink: #1A1F2E;
   }
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    font-feature-settings: 'ss01', 'cv11', 'kern';
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(11, 20, 38, 0.18);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(11, 20, 38, 0.32);
+  }
+
+  /* Native date input — keep arrow subtle on cream */
+  input[type='date']::-webkit-calendar-picker-indicator {
+    opacity: 0.55;
+    cursor: pointer;
+    filter: invert(0.1);
+  }
+}
+
+@layer components {
+  /* Tiny uppercase eyebrow label */
+  .eyebrow {
+    @apply font-mono text-[10px] uppercase tracking-widest text-ink-400;
+  }
+
+  /* The hairline rule used throughout the boarding-pass aesthetic */
+  .rule {
+    @apply h-px w-full bg-midnight-700/10;
+  }
+
+  /* Vintage stamp box (used for "TERMURAH", "LANGSUNG", etc.) */
+  .stamp {
+    @apply inline-flex items-center gap-1 rounded-sm border-2 px-1.5 py-0.5
+           font-mono text-[9px] font-bold uppercase tracking-widest;
+    transform: rotate(-2deg);
+  }
+
+  /* Boarding-pass card surface */
+  .pass-card {
+    @apply relative rounded-[14px] border border-midnight-700/10 bg-cream-50
+           shadow-pass;
+  }
+
+  /* Vertical perforation between pass body and stub */
+  .perforation {
+    position: relative;
+  }
+  .perforation::before,
+  .perforation::after {
+    content: '';
+    position: absolute;
+    left: -9px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--cream);
+    border: 1px solid rgba(11, 20, 38, 0.1);
+  }
+  .perforation::before { top: -9px; }
+  .perforation::after  { bottom: -9px; }
+
+  /* Horizontal dashed connector (departure → arrival) */
+  .dashed-route {
+    background-image: linear-gradient(
+      to right,
+      currentColor 0,
+      currentColor 4px,
+      transparent 4px,
+      transparent 9px
+    );
+    background-size: 9px 1px;
+    background-repeat: repeat-x;
+    background-position: center;
+    height: 1px;
+  }
+
+  /* Editorial form input */
+  .input-editorial {
+    @apply w-full bg-transparent text-ink-700 placeholder:text-ink-400/55
+           font-display text-lg leading-tight tracking-tight
+           focus:outline-none;
+  }
+
+  .input-editorial::placeholder {
+    font-style: italic;
+  }
+
+  /* Numeric / time display */
+  .num-display {
+    @apply font-mono tabular-nums text-midnight-700;
+    font-feature-settings: 'tnum', 'zero';
+  }
+
+  /* Primary CTA — solid midnight with amber underglow */
+  .btn-primary {
+    @apply relative inline-flex items-center justify-center gap-2
+           rounded-full bg-midnight-700 px-6 py-3
+           font-mono text-[11px] font-bold uppercase tracking-widest
+           text-cream-50 transition-all duration-300
+           hover:bg-midnight-600 hover:shadow-[0_12px_28px_-12px_rgba(232,134,42,0.55)]
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60;
+  }
+
+  /* Secondary outline */
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2 rounded-full
+           border border-midnight-700/25 bg-transparent px-5 py-2.5
+           font-mono text-[10px] font-semibold uppercase tracking-widest
+           text-midnight-700 transition-colors
+           hover:border-midnight-700 hover:bg-midnight-700 hover:text-cream-50;
   }
 }
 
 @layer utilities {
-  .price-up    { @apply text-red-500; }
-  .price-down  { @apply text-green-500; }
-  .price-same  { @apply text-gray-400; }
+  .price-up    { @apply text-red-600; }
+  .price-down  { @apply text-emerald-600; }
+  .price-same  { @apply text-ink-400; }
+
+  .text-balance { text-wrap: balance; }
+  .text-pretty  { text-wrap: pretty; }
+
+  /* A very faint inner glow on light cards */
+  .glow-warm {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.6),
+      0 1px 0 rgba(11, 20, 38, 0.04);
+  }
+
+  .mask-fade-r {
+    mask-image: linear-gradient(to right, black 70%, transparent);
+  }
+
+  /* Disable Tailwind preflight on date input weirdness */
+  .date-input::-webkit-datetime-edit {
+    @apply font-display text-lg text-ink-700;
+  }
 }

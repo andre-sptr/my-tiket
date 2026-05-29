@@ -2,48 +2,68 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Bell, PlaneTakeoff } from 'lucide-react';
 import { clsx } from 'clsx';
+
+const NAV_ITEMS = [
+  { href: '/',       label: 'Beranda', code: '01' },
+  { href: '/alerts', label: 'Alert',   code: '02' },
+];
 
 export default function Navbar() {
   const pathname = usePathname();
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-950/80 backdrop-blur">
-      <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 font-bold text-brand-600 text-lg">
-          <PlaneTakeoff className="w-5 h-5" />
-          myTiket
+    <header className="sticky top-0 z-50 border-b border-midnight-700/10 bg-cream-100/85 backdrop-blur-md">
+      <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-8 px-5 py-4 sm:px-8">
+        {/* Wordmark */}
+        <Link
+          href="/"
+          aria-label="myTiket — beranda"
+          className="group flex items-baseline gap-2"
+        >
+          <span className="font-display text-[28px] font-light italic leading-none tracking-tightest text-midnight-700">
+            myTiket
+          </span>
+          <span className="block h-2 w-2 rounded-full bg-amber-400 transition-transform group-hover:scale-150" />
         </Link>
 
-        {/* Nav links */}
-        <div className="flex items-center gap-1">
-          <Link
-            href="/"
-            className={clsx(
-              'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-              pathname === '/'
-                ? 'bg-brand-50 dark:bg-brand-900/30 text-brand-600'
-                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-            )}
-          >
-            Beranda
-          </Link>
-          <Link
-            href="/alerts"
-            className={clsx(
-              'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5',
-              pathname === '/alerts'
-                ? 'bg-brand-50 dark:bg-brand-900/30 text-brand-600'
-                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-            )}
-          >
-            <Bell className="w-4 h-4" />
-            Alert Saya
-          </Link>
+        {/* Editorial nav */}
+        <nav className="flex items-center gap-1">
+          {NAV_ITEMS.map((item) => {
+            const active = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={clsx(
+                  'group relative flex items-baseline gap-2 rounded-full px-4 py-2 transition-colors',
+                  active
+                    ? 'text-midnight-700'
+                    : 'text-ink-500 hover:text-midnight-700'
+                )}
+              >
+                <span className="font-mono text-[9px] uppercase tracking-widest text-ink-400 group-hover:text-amber-500">
+                  {item.code}
+                </span>
+                <span className="font-display text-base italic tracking-tight">
+                  {item.label}
+                </span>
+                {active && (
+                  <span className="absolute inset-x-4 -bottom-0.5 h-px bg-amber-400" />
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Status pill — adds atmosphere; visible only on sm+ */}
+        <div className="hidden items-center gap-2 sm:flex">
+          <span className="block h-2 w-2 animate-pulse-soft rounded-full bg-emerald-500" />
+          <span className="font-mono text-[10px] uppercase tracking-widest text-ink-400">
+            Live · GMT+7
+          </span>
         </div>
       </div>
-    </nav>
+    </header>
   );
 }

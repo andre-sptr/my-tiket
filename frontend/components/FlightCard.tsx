@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Clock, Luggage, BellPlus, ExternalLink, ChevronDown } from 'lucide-react';
+import { Luggage, BellPlus, ExternalLink, ChevronDown, Plane } from 'lucide-react';
 import { formatIDR, formatTime, formatDuration } from '@/lib/format';
 import type { FlightOffer, SearchParams } from '@/lib/types';
 import AlertModal from './AlertModal';
@@ -17,98 +17,148 @@ interface Props {
 export default function FlightCard({ flight, searchParams }: Props) {
   const [showChart, setShowChart] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
-
-  const stops = flight.stops === 0
-    ? 'Langsung'
-    : `${flight.stops} Transit`;
+  const direct = flight.stops === 0;
 
   return (
     <>
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 hover:shadow-md transition-shadow">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-          {/* Airline */}
-          <div className="flex items-center gap-3 sm:w-44">
-            <img
-              src={flight.airline.logo}
-              alt={flight.airline.name}
-              className="w-10 h-10 object-contain rounded"
-              onError={(e) => { (e.target as HTMLImageElement).src = '/airline-placeholder.png'; }}
-            />
-            <div>
-              <div className="font-semibold text-sm">{flight.airline.name}</div>
-              <div className="text-xs text-gray-400">{flight.flightNumber}</div>
-            </div>
-          </div>
+      <article className="pass-card group overflow-hidden transition-transform duration-300 hover:-translate-y-0.5">
+        <div className="grid grid-cols-12 gap-0">
 
-          {/* Schedule */}
-          <div className="flex items-center gap-4 flex-1">
-            <div className="text-center">
-              <div className="text-xl font-bold tabular-nums">{formatTime(flight.departureAt)}</div>
-              <div className="text-xs text-gray-400">{flight.origin}</div>
-            </div>
-
-            <div className="flex-1 flex flex-col items-center">
-              <div className="text-xs text-gray-400 mb-1">{formatDuration(flight.durationMinutes)}</div>
-              <div className="w-full flex items-center gap-1">
-                <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-                <div className={clsx(
-                  'text-xs px-1.5 py-0.5 rounded-full font-medium',
-                  flight.stops === 0
-                    ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
-                    : 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400'
-                )}>
-                  {stops}
+          {/* ============== LEFT: itinerary ============== */}
+          <div className="col-span-12 p-5 sm:p-7 md:col-span-9">
+            {/* top row — airline + source */}
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="relative h-11 w-11 overflow-hidden rounded-md border border-midnight-700/10 bg-cream-50 p-1.5">
+                  <img
+                    src={flight.airline.logo}
+                    alt={flight.airline.name}
+                    className="h-full w-full object-contain"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/airline-placeholder.png';
+                    }}
+                  />
                 </div>
-                <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                <div>
+                  <div className="font-display text-lg font-medium leading-tight text-midnight-700">
+                    {flight.airline.name}
+                  </div>
+                  <div className="font-mono text-[10px] uppercase tracking-widest text-ink-400">
+                    {flight.flightNumber}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {direct && (
+                  <span className="stamp border-emerald-600 text-emerald-700">
+                    Langsung
+                  </span>
+                )}
+                <SourceBadge source={flight.source} />
               </div>
             </div>
 
-            <div className="text-center">
-              <div className="text-xl font-bold tabular-nums">{formatTime(flight.arrivalAt)}</div>
-              <div className="text-xs text-gray-400">{flight.destination}</div>
+            {/* itinerary row */}
+            <div className="mt-6 grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-6">
+              {/* Depart */}
+              <div>
+                <div className="font-display num-display text-[clamp(2rem,5vw,3rem)] font-light leading-none tracking-tightest">
+                  {formatTime(flight.departureAt)}
+                </div>
+                <div className="mt-1.5 flex items-center gap-2">
+                  <span className="font-mono text-sm font-bold text-amber-500">{flight.origin}</span>
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-ink-400">
+                    Berangkat
+                  </span>
+                </div>
+              </div>
+
+              {/* Route */}
+              <div className="flex w-full min-w-[120px] flex-col items-center text-midnight-700/40">
+                <span className="mb-1 font-mono text-[10px] uppercase tracking-widest text-ink-400">
+                  {formatDuration(flight.durationMinutes)}
+                </span>
+                <div className="relative flex w-full items-center">
+                  <span className="block h-1.5 w-1.5 rounded-full bg-midnight-700/50" />
+                  <div className="dashed-route flex-1" />
+                  <Plane className="mx-1 h-4 w-4 -rotate-12 text-amber-400" />
+                  <div className="dashed-route flex-1" />
+                  <span className="block h-1.5 w-1.5 rounded-full bg-midnight-700/50" />
+                </div>
+                <span className={clsx(
+                  'mt-1 font-mono text-[9px] uppercase tracking-widest',
+                  direct ? 'text-emerald-700' : 'text-amber-500'
+                )}>
+                  {direct ? 'Non-stop' : `${flight.stops} Transit`}
+                </span>
+              </div>
+
+              {/* Arrive */}
+              <div className="text-right">
+                <div className="font-display num-display text-[clamp(2rem,5vw,3rem)] font-light leading-none tracking-tightest">
+                  {formatTime(flight.arrivalAt)}
+                </div>
+                <div className="mt-1.5 flex items-center justify-end gap-2">
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-ink-400">
+                    Tiba
+                  </span>
+                  <span className="font-mono text-sm font-bold text-amber-500">{flight.destination}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* footer row */}
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-dashed border-midnight-700/15 pt-4">
+              <button
+                onClick={() => setShowChart(!showChart)}
+                className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-ink-400 transition-colors hover:text-midnight-700"
+              >
+                <ChevronDown className={clsx('h-3 w-3 transition-transform', showChart && 'rotate-180')} />
+                {showChart ? 'Tutup' : 'Lihat'} riwayat harga
+              </button>
+              <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-ink-400">
+                <Luggage className="h-3 w-3" />
+                {flight.baggage}
+              </div>
             </div>
           </div>
 
-          {/* Price & actions */}
-          <div className="flex flex-col items-end gap-2 sm:w-44">
-            <SourceBadge source={flight.source} />
-            <div className="text-2xl font-bold text-brand-600">{formatIDR(flight.priceIdr)}</div>
-            <div className="flex items-center gap-1 text-xs text-gray-400">
-              <Luggage className="w-3 h-3" />
-              {flight.baggage}
+          {/* ============== RIGHT: stub ============== */}
+          <aside className="perforation relative col-span-12 flex flex-col justify-between gap-5 border-t border-dashed border-midnight-700/30 bg-cream-100/60 p-5 sm:p-7 md:col-span-3 md:border-l md:border-t-0">
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-widest text-ink-400">
+                Harga / pax
+              </div>
+              <div className="mt-1 font-display text-[clamp(1.6rem,3vw,2.2rem)] font-light leading-tight tracking-tightest text-midnight-700">
+                {formatIDR(flight.priceIdr)}
+              </div>
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowAlert(true)}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-brand-50 dark:bg-brand-900/30 text-brand-600 hover:bg-brand-100 transition-colors"
-              >
-                <BellPlus className="w-3.5 h-3.5" />
-                Set Alert
-              </button>
+
+            <div className="flex flex-col gap-2">
               <a
                 href={flight.bookingUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-green-50 dark:bg-green-900/30 text-green-600 hover:bg-green-100 transition-colors"
+                className="btn-primary w-full"
               >
                 Pesan
-                <ExternalLink className="w-3 h-3" />
+                <ExternalLink className="h-3 w-3" />
               </a>
+              <button
+                onClick={() => setShowAlert(true)}
+                className="btn-outline w-full"
+              >
+                <BellPlus className="h-3 w-3" />
+                Set Alert
+              </button>
             </div>
-          </div>
+          </aside>
         </div>
 
-        {/* Toggle chart */}
-        <button
-          onClick={() => setShowChart(!showChart)}
-          className="mt-3 flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
-        >
-          <ChevronDown className={clsx('w-3.5 h-3.5 transition-transform', showChart && 'rotate-180')} />
-          {showChart ? 'Sembunyikan' : 'Lihat'} Riwayat Harga
-        </button>
-
+        {/* expanded chart */}
         {showChart && (
-          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+          <div className="border-t border-dashed border-midnight-700/15 bg-cream-50 px-5 py-5 sm:px-7 animate-fade-in">
             <PriceChart
               origin={flight.origin}
               destination={flight.destination}
@@ -117,9 +167,8 @@ export default function FlightCard({ flight, searchParams }: Props) {
             />
           </div>
         )}
-      </div>
+      </article>
 
-      {/* Alert Modal */}
       {showAlert && (
         <AlertModal
           flight={flight}
