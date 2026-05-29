@@ -7,10 +7,13 @@ const SearchQuerySchema = z.object({
   origin: z.string().length(3).toUpperCase(),
   destination: z.string().length(3).toUpperCase(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  returnDate: z.string().optional(),
+  returnDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   adults: z.coerce.number().int().min(1).max(9).default(1),
   cabin: z.enum(['ECONOMY', 'PREMIUM_ECONOMY', 'BUSINESS', 'FIRST']).default('ECONOMY'),
   airlines: z.string().optional(),
+}).refine((query) => !query.returnDate || query.returnDate >= query.date, {
+  message: 'returnDate harus setelah atau sama dengan date',
+  path: ['returnDate'],
 });
 
 export const flightsRouter: FastifyPluginAsync = async (fastify) => {

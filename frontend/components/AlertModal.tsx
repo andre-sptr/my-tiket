@@ -2,12 +2,15 @@
 
 import { useState } from 'react';
 import { X, Loader2, CheckCircle2 } from 'lucide-react';
+import { clsx } from 'clsx';
+import { toast } from 'sonner';
 import { createAlert } from '@/lib/api';
 import { getClientId, addAlertId } from '@/lib/localStorage';
 import { formatIDR } from '@/lib/format';
+import { buildCreateAlertPayload, isValidAlertReturnDate } from '@/lib/alert';
 import { isValidAirportCode } from '@/lib/airport';
+import { getTripType, type TripType } from '@/lib/trip';
 import type { Airport, CabinClass, FlightOffer, SearchParams } from '@/lib/types';
-import { toast } from 'sonner';
 import AirportAutocomplete from './AirportAutocomplete';
 
 interface Props {
@@ -19,6 +22,12 @@ interface Props {
 }
 
 const CABIN_CLASSES: CabinClass[] = ['ECONOMY', 'PREMIUM_ECONOMY', 'BUSINESS', 'FIRST'];
+
+function addDays(dateString: string, days: number): string {
+  const date = new Date(dateString);
+  date.setDate(date.getDate() + days);
+  return date.toISOString().split('T')[0];
+}
 
 export default function AlertModal({
   flight,
@@ -35,16 +44,12 @@ export default function AlertModal({
   const [destinationAirport, setDestinationAirport] = useState<Airport | null>(null);
   const [dateFrom, setDateFrom] = useState(searchParams?.date || today);
   const [dateTo, setDateTo] = useState(() => {
-    if (searchParams?.returnDate) return searchParams.returnDate;
-    if (searchParams?.date) {
-      const d = new Date(searchParams.date);
-      d.setDate(d.getDate() + 7);
-      return d.toISOString().split('T')[0];
-    }
-    const d = new Date();
-    d.setDate(d.getDate() + 14);
-    return d.toISOString().split('T')[0];
+    if (searchParams?.returnDate && searchParams?.date) return searchParams.date;
+    if (searchParams?.date) return addDays(searchParams.date, 7);
+    return addDays(today, 14);
   });
+  const [returnDate, setReturnDate] = useState(searchParams?.returnDate || '');
+  const [tripType, setTripType] = useState<TripType>(getTripType(searchParams?.returnDate));
   const [cabinClass, setCabinClass] = useState<CabinClass>(
     flight?.cabinClass || searchParams?.cabin || 'ECONOMY',
   );
@@ -54,6 +59,13 @@ export default function AlertModal({
     flight ? Math.floor(flight.priceIdr * 0.9) : 1_000_000,
   );
   const [status, setStatus] = useState<'idle' | 'loading' | 'success'>('idle');
+
+  function handleTripTypeChange(nextTripType: TripType) {
+    setTripType(nextTripType);
+    if (nextTripType === 'ROUND_TRIP' && !returnDate) {
+      setReturnDate(addDays(dateTo || dateFrom || today, 7));
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -70,30 +82,44 @@ export default function AlertModal({
       toast.error('Tanggal akhir harus setelah atau sama dengan tanggal mulai.');
       return;
     }
+    if (tripType === 'ROUND_TRIP' && !returnDate) {
+      toast.error('Pilih tanggal pulang untuk alert tiket pulang-pergi.');
+      return;
+    }
+    if (tripType === 'ROUND_TRIP' && returnDate && !isValidAlertReturnDate(dateTo, returnDate)) {
+      toast.error('Tanggal pulang harus setelah atau sama dengan tanggal berangkat terakhir.');
+      return;
+    }
     const phoneDigits = phoneNumber.replace(/\D/g, '');
     if (phoneDigits.length < 8) {
-      toast.error('Nomor HP tidak valid');
+      toast.error('Nomor HP tidak valid.');
       return;
     }
 
     setStatus('loading');
     try {
       const clientId = getClientId();
-      const alert = await createAlert({
-        origin: origin.toUpperCase(),
-        destination: destination.toUpperCase(),
-        departureDateFrom: dateFrom,
-        departureDateTo: dateTo,
-        airlineCode: airlineCode.trim().toUpperCase() || undefined,
-        cabinClass,
-        phoneNumber,
-        maxPriceIdr: maxPrice,
-        clientId,
-      });
+      const alert = await createAlert(
+        buildCreateAlertPayload({
+          origin,
+          destination,
+          departureDateFrom: dateFrom,
+          departureDateTo: dateTo,
+          returnDate,
+          tripType,
+          airlineCode,
+          cabinClass,
+          phoneNumber,
+          maxPriceIdr: maxPrice,
+          clientId,
+        }),
+      );
 
       addAlertId(alert.id);
       setStatus('success');
-      toast.success(`Alert aktif! Notif WhatsApp dikirim saat harga <= ${formatIDR(maxPrice)}.`);
+      toast.success(
+        `Alert ${tripType === 'ROUND_TRIP' ? 'PP ' : ''}aktif. Notif WhatsApp dikirim saat harga <= ${formatIDR(maxPrice)}.`,
+      );
       setTimeout(onClose, 1800);
     } catch (err) {
       toast.error(`Gagal membuat alert: ${(err as Error).message}`);
@@ -107,12 +133,11 @@ export default function AlertModal({
   const monoInput = 'mt-1.5 w-full rounded-lg border border-midnight-700/15 bg-cream-100/60 px-3 py-2.5 font-mono text-sm uppercase tracking-wider text-midnight-700 placeholder:text-ink-400/55 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-midnight-700/55 backdrop-blur-sm animate-fade-in">
-      <div className="pass-card max-h-[90vh] w-full max-w-md overflow-y-auto bg-cream-50">
-        {/* Header */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-midnight-700/55 p-4 backdrop-blur-sm animate-fade-in">
+      <div className="pass-card max-h-[90vh] w-full max-w-lg overflow-y-auto bg-cream-50">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-midnight-700/10 bg-cream-50/95 px-6 py-5 backdrop-blur">
           <div>
-            <p className={labelCls}>№ 01 · Sinyal Harga</p>
+            <p className={labelCls}>No. 01 - Sinyal Harga</p>
             <h2 className="mt-1 font-display text-2xl font-light italic tracking-tight text-midnight-700">
               Set Alert
             </h2>
@@ -133,12 +158,29 @@ export default function AlertModal({
             </div>
             <p className="font-display text-2xl italic text-midnight-700">Alert aktif.</p>
             <p className="font-mono text-[11px] uppercase tracking-widest text-ink-400">
-              Sinyal akan dikirim ke {phoneNumber}
+              Sinyal {tripType === 'ROUND_TRIP' ? 'PP ' : ''}akan dikirim ke {phoneNumber}
             </p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-5 px-6 py-6">
-            {/* Origin / Destination */}
+            <div>
+              <label className={labelCls}>Tipe Tiket</label>
+              <div className="mt-1.5 inline-flex rounded-full border border-midnight-700/10 bg-cream-100/70 p-1">
+                <TripTypeButton
+                  active={tripType === 'ONE_WAY'}
+                  onClick={() => handleTripTypeChange('ONE_WAY')}
+                >
+                  Sekali Jalan
+                </TripTypeButton>
+                <TripTypeButton
+                  active={tripType === 'ROUND_TRIP'}
+                  onClick={() => handleTripTypeChange('ROUND_TRIP')}
+                >
+                  Pulang Pergi
+                </TripTypeButton>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>Dari</label>
@@ -180,7 +222,6 @@ export default function AlertModal({
               </div>
             </div>
 
-            {/* Date range */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>Berangkat dari</label>
@@ -188,25 +229,47 @@ export default function AlertModal({
                   type="date"
                   value={dateFrom}
                   min={today}
-                  onChange={(e) => setDateFrom(e.target.value)}
+                  onChange={(e) => {
+                    const nextDateFrom = e.target.value;
+                    const nextDateTo = dateTo < nextDateFrom ? nextDateFrom : dateTo;
+                    setDateFrom(nextDateFrom);
+                    if (nextDateTo !== dateTo) setDateTo(nextDateTo);
+                    if (returnDate && returnDate < nextDateTo) setReturnDate('');
+                  }}
                   className={inputCls}
                   required
                 />
               </div>
               <div>
-                <label className={labelCls}>Sampai</label>
+                <label className={labelCls}>Berangkat sampai</label>
                 <input
                   type="date"
                   value={dateTo}
                   min={dateFrom}
-                  onChange={(e) => setDateTo(e.target.value)}
+                  onChange={(e) => {
+                    const nextDateTo = e.target.value;
+                    setDateTo(nextDateTo);
+                    if (returnDate && returnDate < nextDateTo) setReturnDate('');
+                  }}
                   className={inputCls}
                   required
                 />
               </div>
+              {tripType === 'ROUND_TRIP' && (
+                <div className="col-span-2">
+                  <label className={labelCls}>Pulang</label>
+                  <input
+                    type="date"
+                    value={returnDate}
+                    min={dateTo || dateFrom || today}
+                    onChange={(e) => setReturnDate(e.target.value)}
+                    className={inputCls}
+                    required
+                  />
+                </div>
+              )}
             </div>
 
-            {/* Cabin & Airline */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>Kelas</label>
@@ -237,7 +300,6 @@ export default function AlertModal({
               </div>
             </div>
 
-            {/* Phone */}
             <div>
               <label className={labelCls}>Nomor WhatsApp</label>
               <input
@@ -253,9 +315,8 @@ export default function AlertModal({
               </p>
             </div>
 
-            {/* Max price */}
             <div>
-              <label className={labelCls}>Beri tahu kalau harga ≤</label>
+              <label className={labelCls}>Beri tahu kalau harga &lt;=</label>
               <div className="relative mt-1.5">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-xs uppercase tracking-widest text-ink-400">
                   Rp
@@ -271,7 +332,7 @@ export default function AlertModal({
                 />
               </div>
               <p className="mt-1.5 font-display text-sm italic text-amber-500">
-                ≈ {formatIDR(maxPrice)}
+                sekitar {formatIDR(maxPrice)}
               </p>
             </div>
 
@@ -283,7 +344,7 @@ export default function AlertModal({
               {status === 'loading' ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Mengaktifkan…
+                  Mengaktifkan...
                 </>
               ) : (
                 <>Aktifkan Alert</>
@@ -293,5 +354,30 @@ export default function AlertModal({
         )}
       </div>
     </div>
+  );
+}
+
+function TripTypeButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={clsx(
+        'rounded-full px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-all',
+        active
+          ? 'bg-midnight-700 text-cream-50 shadow-pass'
+          : 'text-ink-400 hover:text-midnight-700',
+      )}
+    >
+      {children}
+    </button>
   );
 }

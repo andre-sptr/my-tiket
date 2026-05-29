@@ -6,6 +6,7 @@ import { Search, ArrowLeftRight, Plane, Loader2 } from 'lucide-react';
 import { useIsFetching } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { Airport, CabinClass } from '@/lib/types';
+import { buildFlightSearchQuery, getTripType, isValidReturnDate, type TripType } from '@/lib/trip';
 import { clsx } from 'clsx';
 import AirportAutocomplete from './AirportAutocomplete';
 
@@ -30,6 +31,10 @@ export default function SearchForm({ compact = false }: Props) {
   const [destination, setDestination] = useState(searchParams.get('destination') || '');
   const [destinationAirport, setDestinationAirport] = useState<Airport | null>(null);
   const [date,        setDate]        = useState(searchParams.get('date') || '');
+  const [returnDate,  setReturnDate]  = useState(searchParams.get('returnDate') || '');
+  const [tripType,    setTripType]    = useState<TripType>(
+    getTripType(searchParams.get('returnDate'))
+  );
   const [adults,      setAdults]      = useState(Number(searchParams.get('adults') || 1));
   const [cabin,       setCabin]       = useState<CabinClass>(
     (searchParams.get('cabin') as CabinClass) || 'ECONOMY'
@@ -90,10 +95,22 @@ export default function SearchForm({ compact = false }: Props) {
       toast.error('Pilih tanggal keberangkatan.');
       return;
     }
+    if (tripType === 'ROUND_TRIP' && !returnDate) {
+      toast.error('Pilih tanggal pulang untuk tiket pulang-pergi.');
+      return;
+    }
+    if (tripType === 'ROUND_TRIP' && returnDate && !isValidReturnDate(date, returnDate)) {
+      toast.error('Tanggal pulang harus setelah atau sama dengan tanggal berangkat.');
+      return;
+    }
 
-    const qs = new URLSearchParams({
-      origin, destination, date,
-      adults: String(adults),
+    const qs = buildFlightSearchQuery({
+      origin,
+      destination,
+      date,
+      returnDate,
+      tripType,
+      adults,
       cabin,
     });
     setIsSubmitting(true);
@@ -112,6 +129,23 @@ export default function SearchForm({ compact = false }: Props) {
     >
       {/* ============== MAIN PASS BODY (cols 1–9) ============== */}
       <div className="col-span-12 grid grid-cols-1 gap-0 lg:col-span-9 lg:grid-cols-2">
+        <div className="col-span-1 border-b border-midnight-700/10 p-5 sm:p-6 lg:col-span-2">
+          <div className="inline-flex rounded-full border border-midnight-700/10 bg-cream-100/70 p-1">
+            <TripTypeButton
+              active={tripType === 'ONE_WAY'}
+              onClick={() => setTripType('ONE_WAY')}
+            >
+              Sekali Jalan
+            </TripTypeButton>
+            <TripTypeButton
+              active={tripType === 'ROUND_TRIP'}
+              onClick={() => setTripType('ROUND_TRIP')}
+            >
+              Pulang Pergi
+            </TripTypeButton>
+          </div>
+        </div>
+
         {/* Origin field */}
         <FieldCell label="Dari" code={origin || 'IATA'} className="border-b lg:border-b lg:border-r">
           <AirportAutocomplete
@@ -158,13 +192,33 @@ export default function SearchForm({ compact = false }: Props) {
             className="input-editorial date-input"
             value={date}
             min={new Date().toISOString().split('T')[0]}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={(e) => {
+              setDate(e.target.value);
+              if (returnDate && returnDate < e.target.value) setReturnDate('');
+            }}
             required
           />
         </FieldCell>
 
+        {tripType === 'ROUND_TRIP' && (
+          <FieldCell label="Pulang" code="RTN" className="border-b">
+            <input
+              type="date"
+              className="input-editorial date-input"
+              value={returnDate}
+              min={date || new Date().toISOString().split('T')[0]}
+              onChange={(e) => setReturnDate(e.target.value)}
+              required
+            />
+          </FieldCell>
+        )}
+
         {/* Adults + cabin in a single cell on lg */}
-        <FieldCell label="Kabin & Penumpang" code="PAX" className="border-b lg:border-b-0">
+        <FieldCell
+          label="Kabin & Penumpang"
+          code="PAX"
+          className={clsx('border-b lg:border-b-0', tripType === 'ROUND_TRIP' && 'lg:col-span-2')}
+        >
           <div className="flex items-center gap-3">
             <select
               className="input-editorial -ml-1 max-w-[120px] cursor-pointer pr-4"
@@ -208,6 +262,7 @@ export default function SearchForm({ compact = false }: Props) {
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-3">
+            <Meta label="Trip"   value={tripType === 'ROUND_TRIP' ? 'pp' : 'one'} />
             <Meta label="Pax"    value={`0${adults}`} />
             <Meta label="Kabin"  value={cabin.slice(0, 4).toLowerCase()} />
           </div>
@@ -227,6 +282,31 @@ export default function SearchForm({ compact = false }: Props) {
         </button>
       </aside>
     </form>
+  );
+}
+
+function TripTypeButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={clsx(
+        'rounded-full px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-all',
+        active
+          ? 'bg-midnight-700 text-cream-50 shadow-pass'
+          : 'text-ink-400 hover:text-midnight-700'
+      )}
+    >
+      {children}
+    </button>
   );
 }
 

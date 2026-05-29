@@ -83,6 +83,11 @@ function SearchResults() {
         </div>
         <div className="hidden text-right font-mono text-[10px] uppercase tracking-widest text-ink-400 sm:block">
           <div>{new Date(params.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+          {params.returnDate && (
+            <div>
+              Pulang {new Date(params.returnDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+            </div>
+          )}
           <div>{params.adults} pax · {params.cabin.toLowerCase()}</div>
         </div>
       </div>

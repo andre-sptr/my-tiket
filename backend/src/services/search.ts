@@ -37,9 +37,11 @@ export class UnifiedSearchService {
 
     // Tentukan mana yang dari Duffel, mana yang di-scrape
     const useDuffel = !requestedAirlines || requestedAirlines.some((a) => DUFFEL_AIRLINES.has(a)) || requestedAirlines.length === 0;
-    const lccToScrape = requestedAirlines
-      ? requestedAirlines.filter((a) => LCC_AIRLINES.has(a))
-      : Array.from(LCC_AIRLINES);
+    const lccToScrape = params.returnDate
+      ? []
+      : requestedAirlines
+        ? requestedAirlines.filter((a) => LCC_AIRLINES.has(a))
+        : Array.from(LCC_AIRLINES);
 
     const tasks: Promise<FlightOffer[]>[] = [];
     const sources: string[] = [];

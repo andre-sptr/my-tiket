@@ -53,6 +53,7 @@ export interface Alert {
   destination: string;
   departureDateFrom: string;
   departureDateTo: string;
+  returnDate: string | null;
   airlineCode: string | null;
   cabinClass: CabinClass;
   phoneNumber: string;
@@ -71,6 +72,7 @@ export interface CreateAlertPayload {
   destination: string;
   departureDateFrom: string;
   departureDateTo: string;
+  returnDate?: string;
   airlineCode?: string;
   cabinClass: CabinClass;
   phoneNumber: string;

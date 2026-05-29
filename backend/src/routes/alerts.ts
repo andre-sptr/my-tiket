@@ -2,12 +2,13 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { normalizePhoneToE164, sendWhatsAppText, wahaEnabled } from '../services/waha';
 
-const CreateAlertSchema = z
+export const CreateAlertSchema = z
   .object({
     origin: z.string().length(3).toUpperCase(),
     destination: z.string().length(3).toUpperCase(),
     departureDateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     departureDateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    returnDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
     airlineCode: z.string().min(1).max(10).optional().nullable(),
     cabinClass: z.enum(['ECONOMY', 'PREMIUM_ECONOMY', 'BUSINESS', 'FIRST']).default('ECONOMY'),
     phoneNumber: z.string().min(8).max(20),
@@ -15,8 +16,12 @@ const CreateAlertSchema = z
     clientId: z.string().min(1).max(64),
   })
   .refine((d) => d.departureDateFrom <= d.departureDateTo, {
-    message: 'departureDateTo harus ≥ departureDateFrom',
+    message: 'departureDateTo harus setelah atau sama dengan departureDateFrom',
     path: ['departureDateTo'],
+  })
+  .refine((d) => !d.returnDate || d.returnDate >= d.departureDateTo, {
+    message: 'returnDate harus setelah atau sama dengan departureDateTo',
+    path: ['returnDate'],
   });
 
 export const alertsRouter: FastifyPluginAsync = async (fastify) => {
@@ -32,6 +37,7 @@ export const alertsRouter: FastifyPluginAsync = async (fastify) => {
       destination,
       departureDateFrom,
       departureDateTo,
+      returnDate,
       airlineCode,
       cabinClass,
       phoneNumber,
@@ -50,6 +56,7 @@ export const alertsRouter: FastifyPluginAsync = async (fastify) => {
         destination,
         departureDateFrom: new Date(departureDateFrom),
         departureDateTo: new Date(departureDateTo),
+        returnDate: returnDate ? new Date(returnDate) : null,
         airlineCode: airlineCode || null,
         cabinClass,
         phoneNumber: phoneE164,
@@ -118,6 +125,7 @@ function serializeAlert(a: any) {
     destination: a.destination,
     departureDateFrom: a.departureDateFrom.toISOString().split('T')[0],
     departureDateTo: a.departureDateTo.toISOString().split('T')[0],
+    returnDate: a.returnDate ? a.returnDate.toISOString().split('T')[0] : null,
     airlineCode: a.airlineCode,
     cabinClass: a.cabinClass,
     phoneNumber: a.phoneNumber,

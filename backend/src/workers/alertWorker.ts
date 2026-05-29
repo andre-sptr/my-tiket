@@ -5,6 +5,7 @@ import { DuffelService } from '../services/duffel';
 import { ScraperService } from '../services/scraper/index';
 import { sendWhatsAppText } from '../services/waha';
 import { formatIDR } from '../utils/format';
+import { buildAlertSearchGroupKey, formatOptionalDate } from './alertSearch';
 
 const QUEUE_NAME = 'price-checker';
 // VPS resource-constrained: cek tiap 2 jam (sebelumnya 30 menit)
@@ -57,16 +58,17 @@ export function startAlertWorker() {
 
       console.log(`[AlertWorker] Checking ${alerts.length} active alerts`);
 
-      // Group by origin+destination biar share API call lintas alert
+      // Group criteria that must share the same provider request.
       const groups = new Map<string, typeof alerts>();
       for (const alert of alerts) {
-        const key = `${alert.origin}:${alert.destination}`;
+        const key = buildAlertSearchGroupKey(alert);
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key)!.push(alert);
       }
 
       for (const [, groupAlerts] of groups) {
         const representative = groupAlerts[0];
+        const returnDate = formatOptionalDate(representative.returnDate);
 
         // Kumpulkan semua tanggal unik yang perlu dicek dari semua alert di grup
         const datesToCheck = new Set<string>();
@@ -91,6 +93,7 @@ export function startAlertWorker() {
               origin: representative.origin,
               destination: representative.destination,
               date: dateStr,
+              returnDate,
               adults: 1,
               cabin: representative.cabinClass,
             });
@@ -105,20 +108,22 @@ export function startAlertWorker() {
           }
           await sleep(300);
 
-          // LCC scrapers (semua, mahal — tapi worker jalan tiap 2 jam saja)
-          for (const code of LCC_CODES) {
-            try {
-              const price = await scraperService.getLatestPrice(
-                code,
-                representative.origin,
-                representative.destination,
-                dateStr,
-              );
-              if (price) datePrices.set(code, price);
-            } catch {
-              // skip per-airline scraper failure
+          // LCC scrapers belum mendukung return leg, jadi hanya dipakai untuk one-way.
+          if (!returnDate) {
+            for (const code of LCC_CODES) {
+              try {
+                const price = await scraperService.getLatestPrice(
+                  code,
+                  representative.origin,
+                  representative.destination,
+                  dateStr,
+                );
+                if (price) datePrices.set(code, price);
+              } catch {
+                // skip per-airline scraper failure
+              }
+              await sleep(2000); // sopan ke LCC site
             }
-            await sleep(2000); // sopan ke LCC site
           }
 
           priceMap.set(dateStr, datePrices);
@@ -208,14 +213,27 @@ async function triggerAlert(
   price: number,
 ) {
   const dateObj = new Date(dateStr);
+  const returnDate = formatOptionalDate(alert.returnDate);
+  const returnDateLine = returnDate
+    ? `Pulang: *${formatDate(new Date(returnDate))}*\n`
+    : '';
+  const searchQuery = [
+    airlineCode,
+    'flights',
+    alert.origin,
+    alert.destination,
+    dateStr,
+    returnDate,
+  ].filter(Boolean).join('+');
   const text =
     `🎫 *Harga Tiket Turun!*\n\n` +
     `${alert.origin} → ${alert.destination}\n` +
     `Maskapai: *${airlineCode}*\n` +
-    `Tanggal: *${formatDate(dateObj)}*\n` +
+    `Tanggal pergi: *${formatDate(dateObj)}*\n` +
+    returnDateLine +
     `Harga: *${formatIDR(price)}*\n` +
     `Target Anda: ${formatIDR(Number(alert.maxPriceIdr))}\n\n` +
-    `Cek sekarang: https://www.google.com/travel/flights?q=${airlineCode}+flights+${alert.origin}+${alert.destination}+${dateStr}\n\n` +
+    `Cek sekarang: https://www.google.com/travel/flights?q=${searchQuery}\n\n` +
     `Alert ini akan otomatis nonaktif. Set lagi kalau perlu pantau ulang.`;
 
   const sent = await sendWhatsAppText(alert.phoneNumber, text);

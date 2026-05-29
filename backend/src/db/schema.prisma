@@ -54,6 +54,7 @@ model Alert {
   destination         String       @db.VarChar(3)
   departureDateFrom   DateTime     @db.Date
   departureDateTo     DateTime     @db.Date
+  returnDate          DateTime?    @db.Date
   airlineCode         String?      @db.VarChar(10)  // null = semua maskapai
   cabinClass          CabinClass   @default(ECONOMY)
   // Notification (WhatsApp via WAHA)

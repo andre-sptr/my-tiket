@@ -54,6 +54,13 @@ export default function AlertList({ alerts, onDelete, triggered = false }: Props
                   )}
                 </span>
                 <span>·</span>
+                {alert.returnDate && (
+                  <>
+                    <span>PP</span>
+                    <span>Pulang {formatShortDate(alert.returnDate)}</span>
+                    <span>/</span>
+                  </>
+                )}
                 <span>{alert.cabinClass.replace('_', ' ')}</span>
                 <span>·</span>
                 <span className="flex items-center gap-1.5">
