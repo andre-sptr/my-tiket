@@ -5,8 +5,10 @@ import { X, Loader2, CheckCircle2 } from 'lucide-react';
 import { createAlert } from '@/lib/api';
 import { getClientId, addAlertId } from '@/lib/localStorage';
 import { formatIDR } from '@/lib/format';
-import type { CabinClass, FlightOffer, SearchParams } from '@/lib/types';
+import { isValidAirportCode } from '@/lib/airport';
+import type { Airport, CabinClass, FlightOffer, SearchParams } from '@/lib/types';
 import { toast } from 'sonner';
+import AirportAutocomplete from './AirportAutocomplete';
 
 interface Props {
   flight?: FlightOffer;
@@ -28,7 +30,9 @@ export default function AlertModal({
   const today = new Date().toISOString().split('T')[0];
 
   const [origin, setOrigin] = useState(flight?.origin || defaultOrigin || '');
+  const [originAirport, setOriginAirport] = useState<Airport | null>(null);
   const [destination, setDestination] = useState(flight?.destination || defaultDestination || '');
+  const [destinationAirport, setDestinationAirport] = useState<Airport | null>(null);
   const [dateFrom, setDateFrom] = useState(searchParams?.date || today);
   const [dateTo, setDateTo] = useState(() => {
     if (searchParams?.returnDate) return searchParams.returnDate;
@@ -54,12 +58,16 @@ export default function AlertModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (origin.length !== 3 || destination.length !== 3) {
-      toast.error('Kode bandara harus 3 huruf (mis. CGK, DPS)');
+    if (!isValidAirportCode(origin) || !isValidAirportCode(destination)) {
+      toast.error('Pilih bandara asal dan tujuan dari dropdown.');
+      return;
+    }
+    if (origin.toUpperCase() === destination.toUpperCase()) {
+      toast.error('Bandara asal dan tujuan tidak boleh sama.');
       return;
     }
     if (dateTo < dateFrom) {
-      toast.error('Tanggal akhir harus ≥ tanggal mulai');
+      toast.error('Tanggal akhir harus setelah atau sama dengan tanggal mulai.');
       return;
     }
     const phoneDigits = phoneNumber.replace(/\D/g, '');
@@ -85,7 +93,7 @@ export default function AlertModal({
 
       addAlertId(alert.id);
       setStatus('success');
-      toast.success(`Alert aktif! Notif WhatsApp dikirim saat harga ≤ ${formatIDR(maxPrice)}.`);
+      toast.success(`Alert aktif! Notif WhatsApp dikirim saat harga <= ${formatIDR(maxPrice)}.`);
       setTimeout(onClose, 1800);
     } catch (err) {
       toast.error(`Gagal membuat alert: ${(err as Error).message}`);
@@ -95,6 +103,7 @@ export default function AlertModal({
 
   const labelCls = 'font-mono text-[10px] uppercase tracking-widest text-ink-400';
   const inputCls = 'mt-1.5 w-full rounded-lg border border-midnight-700/15 bg-cream-100/60 px-3 py-2.5 font-display text-base text-midnight-700 placeholder:text-ink-400/55 placeholder:italic focus:border-amber-400 focus:bg-cream-50 focus:outline-none focus:ring-2 focus:ring-amber-400/30';
+  const airportInputCls = 'w-full rounded-lg border border-midnight-700/15 bg-cream-100/60 px-3 py-2.5 font-display text-base text-midnight-700 placeholder:text-ink-400/55 placeholder:italic focus:border-amber-400 focus:bg-cream-50 focus:outline-none focus:ring-2 focus:ring-amber-400/30';
   const monoInput = 'mt-1.5 w-full rounded-lg border border-midnight-700/15 bg-cream-100/60 px-3 py-2.5 font-mono text-sm uppercase tracking-wider text-midnight-700 placeholder:text-ink-400/55 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30';
 
   return (
@@ -132,28 +141,42 @@ export default function AlertModal({
             {/* Origin / Destination */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className={labelCls}>Dari (IATA)</label>
-                <input
-                  type="text"
-                  value={origin}
-                  onChange={(e) => setOrigin(e.target.value.toUpperCase().slice(0, 3))}
-                  placeholder="CGK"
-                  maxLength={3}
-                  className={monoInput}
-                  required
-                />
+                <label className={labelCls}>Dari</label>
+                <div className="mt-1.5">
+                  <AirportAutocomplete
+                    value={origin}
+                    selectedAirport={originAirport}
+                    placeholder="Ketik kota asal"
+                    onSelect={(airport) => {
+                      setOrigin(airport.iataCode);
+                      setOriginAirport(airport);
+                    }}
+                    onClear={() => {
+                      setOrigin('');
+                      setOriginAirport(null);
+                    }}
+                    inputClassName={airportInputCls}
+                  />
+                </div>
               </div>
               <div>
-                <label className={labelCls}>Tujuan (IATA)</label>
-                <input
-                  type="text"
-                  value={destination}
-                  onChange={(e) => setDestination(e.target.value.toUpperCase().slice(0, 3))}
-                  placeholder="DPS"
-                  maxLength={3}
-                  className={monoInput}
-                  required
-                />
+                <label className={labelCls}>Ke</label>
+                <div className="mt-1.5">
+                  <AirportAutocomplete
+                    value={destination}
+                    selectedAirport={destinationAirport}
+                    placeholder="Ketik kota tujuan"
+                    onSelect={(airport) => {
+                      setDestination(airport.iataCode);
+                      setDestinationAirport(airport);
+                    }}
+                    onClear={() => {
+                      setDestination('');
+                      setDestinationAirport(null);
+                    }}
+                    inputClassName={airportInputCls}
+                  />
+                </div>
               </div>
             </div>
 

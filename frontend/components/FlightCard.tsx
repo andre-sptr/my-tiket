@@ -14,10 +14,21 @@ interface Props {
   searchParams: SearchParams;
 }
 
+const SOURCE_LABELS: Record<FlightOffer['source'], string> = {
+  DUFFEL: 'Duffel',
+  AMADEUS: 'Amadeus',
+  LIONAIR: 'Lion Air',
+  CITILINK: 'Citilink',
+  AIRASIA: 'AirAsia',
+  SUPERAIRJET: 'Super Jet',
+};
+
 export default function FlightCard({ flight, searchParams }: Props) {
   const [showChart, setShowChart] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
   const direct = flight.stops === 0;
+  const sourceLabel = SOURCE_LABELS[flight.source] || 'Sumber';
+  const bookingUrl = flight.bookingUrl?.trim();
 
   return (
     <>
@@ -136,15 +147,26 @@ export default function FlightCard({ flight, searchParams }: Props) {
             </div>
 
             <div className="flex flex-col gap-2">
-              <a
-                href={flight.bookingUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-primary w-full"
-              >
-                Pesan
-                <ExternalLink className="h-3 w-3" />
-              </a>
+              {bookingUrl ? (
+                <a
+                  href={bookingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Pesan ${flight.flightNumber} melalui ${sourceLabel}`}
+                  className="btn-primary w-full whitespace-nowrap"
+                >
+                  Pesan di {sourceLabel}
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  className="btn-primary w-full cursor-not-allowed opacity-55"
+                >
+                  Link Belum Ada
+                </button>
+              )}
               <button
                 onClick={() => setShowAlert(true)}
                 className="btn-outline w-full"
@@ -152,6 +174,9 @@ export default function FlightCard({ flight, searchParams }: Props) {
                 <BellPlus className="h-3 w-3" />
                 Set Alert
               </button>
+              <p className="text-center font-mono text-[9px] uppercase tracking-widest text-ink-400">
+                Buka sumber harga
+              </p>
             </div>
           </aside>
         </div>

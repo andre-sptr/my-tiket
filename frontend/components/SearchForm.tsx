@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Search, ArrowLeftRight, Plane } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { searchAirports } from '@/lib/api';
+import { Search, ArrowLeftRight, Plane, Loader2 } from 'lucide-react';
+import { useIsFetching } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import type { Airport, CabinClass } from '@/lib/types';
 import { clsx } from 'clsx';
+import AirportAutocomplete from './AirportAutocomplete';
 
 const CABIN_OPTIONS: { value: CabinClass; label: string }[] = [
   { value: 'ECONOMY',          label: 'Ekonomi' },
@@ -22,62 +23,83 @@ interface Props {
 export default function SearchForm({ compact = false }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const paramsFingerprint = searchParams.toString();
 
   const [origin,      setOrigin]      = useState(searchParams.get('origin') || '');
-  const [originName,  setOriginName]  = useState('');
+  const [originAirport, setOriginAirport] = useState<Airport | null>(null);
   const [destination, setDestination] = useState(searchParams.get('destination') || '');
-  const [destName,    setDestName]    = useState('');
+  const [destinationAirport, setDestinationAirport] = useState<Airport | null>(null);
   const [date,        setDate]        = useState(searchParams.get('date') || '');
   const [adults,      setAdults]      = useState(Number(searchParams.get('adults') || 1));
   const [cabin,       setCabin]       = useState<CabinClass>(
     (searchParams.get('cabin') as CabinClass) || 'ECONOMY'
   );
 
-  const [originQuery, setOriginQuery] = useState('');
-  const [destQuery,   setDestQuery]   = useState('');
-  const [activeInput, setActiveInput] = useState<'origin' | 'dest' | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRoutePending, startTransition] = useTransition();
+  const activeFlightFetches = useIsFetching({ queryKey: ['flights'] });
+  const isSearching = isSubmitting || isRoutePending || (compact && activeFlightFetches > 0);
 
-  const { data: originResults } = useQuery({
-    queryKey: ['airports', originQuery],
-    queryFn:  () => searchAirports(originQuery),
-    enabled:  originQuery.length >= 2,
-  });
-
-  const { data: destResults } = useQuery({
-    queryKey: ['airports', destQuery],
-    queryFn:  () => searchAirports(destQuery),
-    enabled:  destQuery.length >= 2,
-  });
+  useEffect(() => {
+    setIsSubmitting(false);
+  }, [paramsFingerprint]);
 
   function selectAirport(airport: Airport, type: 'origin' | 'dest') {
     if (type === 'origin') {
       setOrigin(airport.iataCode);
-      setOriginName(`${airport.cityName}`);
-      setOriginQuery('');
+      setOriginAirport(airport);
     } else {
       setDestination(airport.iataCode);
-      setDestName(`${airport.cityName}`);
-      setDestQuery('');
+      setDestinationAirport(airport);
     }
-    setActiveInput(null);
+  }
+
+  function clearAirport(type: 'origin' | 'dest') {
+    if (type === 'origin') {
+      setOrigin('');
+      setOriginAirport(null);
+    } else {
+      setDestination('');
+      setDestinationAirport(null);
+    }
   }
 
   function swapLocations() {
-    setOrigin(destination);
-    setOriginName(destName);
-    setDestination(origin);
-    setDestName(originName);
+    const nextOrigin = destination;
+    const nextOriginAirport = destinationAirport;
+    const nextDestination = origin;
+    const nextDestinationAirport = originAirport;
+
+    setOrigin(nextOrigin);
+    setOriginAirport(nextOriginAirport);
+    setDestination(nextDestination);
+    setDestinationAirport(nextDestinationAirport);
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!origin || !destination || !date) return;
+    if (!origin || !destination) {
+      toast.error('Pilih bandara asal dan tujuan dari dropdown.');
+      return;
+    }
+    if (origin === destination) {
+      toast.error('Bandara asal dan tujuan tidak boleh sama.');
+      return;
+    }
+    if (!date) {
+      toast.error('Pilih tanggal keberangkatan.');
+      return;
+    }
+
     const qs = new URLSearchParams({
       origin, destination, date,
       adults: String(adults),
       cabin,
     });
-    router.push(`/search?${qs}`);
+    setIsSubmitting(true);
+    startTransition(() => {
+      router.push(`/search?${qs}`);
+    });
   }
 
   return (
@@ -92,32 +114,24 @@ export default function SearchForm({ compact = false }: Props) {
       <div className="col-span-12 grid grid-cols-1 gap-0 lg:col-span-9 lg:grid-cols-2">
         {/* Origin field */}
         <FieldCell label="Dari" code={origin || 'IATA'} className="border-b lg:border-b lg:border-r">
-          <input
-            className="input-editorial"
-            placeholder="Jakarta"
-            value={activeInput === 'origin' ? originQuery : originName || origin}
-            onChange={(e) => { setOriginQuery(e.target.value); setActiveInput('origin'); }}
-            onFocus={() => setActiveInput('origin')}
-            required
+          <AirportAutocomplete
+            value={origin}
+            selectedAirport={originAirport}
+            placeholder="Ketik kota asal"
+            onSelect={(airport) => selectAirport(airport, 'origin')}
+            onClear={() => clearAirport('origin')}
           />
-          {activeInput === 'origin' && originResults && originResults.length > 0 && (
-            <AirportDropdown results={originResults} onSelect={(a) => selectAirport(a, 'origin')} />
-          )}
         </FieldCell>
 
         {/* Destination field */}
         <FieldCell label="Ke" code={destination || 'IATA'} className="border-b">
-          <input
-            className="input-editorial"
-            placeholder="Singapura"
-            value={activeInput === 'dest' ? destQuery : destName || destination}
-            onChange={(e) => { setDestQuery(e.target.value); setActiveInput('dest'); }}
-            onFocus={() => setActiveInput('dest')}
-            required
+          <AirportAutocomplete
+            value={destination}
+            selectedAirport={destinationAirport}
+            placeholder="Ketik kota tujuan"
+            onSelect={(airport) => selectAirport(airport, 'dest')}
+            onClear={() => clearAirport('dest')}
           />
-          {activeInput === 'dest' && destResults && destResults.length > 0 && (
-            <AirportDropdown results={destResults} onSelect={(a) => selectAirport(a, 'dest')} />
-          )}
         </FieldCell>
 
         {/* Dashed flight route + swap button */}
@@ -199,9 +213,17 @@ export default function SearchForm({ compact = false }: Props) {
           </div>
         </div>
 
-        <button type="submit" className="btn-primary w-full">
-          <Search className="h-3.5 w-3.5" />
-          Cari Tiket
+        <button
+          type="submit"
+          disabled={isSearching}
+          className="btn-primary w-full disabled:cursor-wait disabled:opacity-70"
+        >
+          {isSearching ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Search className="h-3.5 w-3.5" />
+          )}
+          {isSearching ? 'Mencari...' : 'Cari Tiket'}
         </button>
       </aside>
     </form>
@@ -241,37 +263,6 @@ function Meta({ label, value }: { label: string; value: string }) {
     <div>
       <div className="font-mono text-[9px] uppercase tracking-widest text-ink-400">{label}</div>
       <div className="font-display text-base text-midnight-700">{value}</div>
-    </div>
-  );
-}
-
-function AirportDropdown({
-  results,
-  onSelect,
-}: {
-  results: Airport[];
-  onSelect: (a: Airport) => void;
-}) {
-  return (
-    <div className="absolute left-0 right-0 top-full z-30 mt-3 max-h-64 overflow-auto rounded-xl border border-midnight-700/10 bg-cream-50 shadow-pass">
-      {results.map((ap) => (
-        <button
-          key={ap.iataCode}
-          type="button"
-          onClick={() => onSelect(ap)}
-          className="flex w-full items-center gap-4 border-b border-midnight-700/5 px-4 py-3 text-left last:border-b-0 hover:bg-cream-100"
-        >
-          <span className="font-mono text-sm font-bold text-amber-500">
-            {ap.iataCode}
-          </span>
-          <span className="flex-1 font-display text-base italic text-midnight-700">
-            {ap.cityName}
-          </span>
-          <span className="font-mono text-[10px] uppercase tracking-widest text-ink-400">
-            {ap.countryCode}
-          </span>
-        </button>
-      ))}
     </div>
   );
 }
