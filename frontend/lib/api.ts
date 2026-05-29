@@ -85,19 +85,11 @@ export async function deleteAlert(alertId: string): Promise<void> {
   await fetcher(`/alerts/${alertId}`, { method: 'DELETE' });
 }
 
-// ─── Push ─────────────────────────────────────────────────────────────────────
+// ─── WhatsApp test ────────────────────────────────────────────────────────────
 
-export async function getVapidPublicKey(): Promise<string> {
-  const data = await fetcher<{ publicKey: string }>('/push/vapid-key');
-  return data.publicKey;
-}
-
-export async function savePushSubscription(
-  subscription: PushSubscriptionJSON,
-  clientId: string
-): Promise<void> {
-  await fetcher('/push/subscribe', {
+export async function testWhatsApp(phoneNumber: string): Promise<{ ok: boolean }> {
+  return fetcher<{ ok: boolean }>('/alerts/test-whatsapp', {
     method: 'POST',
-    body: JSON.stringify({ subscription, clientId }),
+    body: JSON.stringify({ phoneNumber }),
   });
 }

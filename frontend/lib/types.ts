@@ -1,6 +1,6 @@
 // ─── Shared Types ─────────────────────────────────────────────────────────────
 
-export type FlightSource = 'AMADEUS' | 'LIONAIR' | 'CITILINK' | 'AIRASIA' | 'SUPERAIRJET';
+export type FlightSource = 'DUFFEL' | 'AMADEUS' | 'LIONAIR' | 'CITILINK' | 'AIRASIA' | 'SUPERAIRJET';
 export type CabinClass = 'ECONOMY' | 'PREMIUM_ECONOMY' | 'BUSINESS' | 'FIRST';
 
 export interface FlightOffer {
@@ -51,14 +51,17 @@ export interface Alert {
   id: string;
   origin: string;
   destination: string;
-  departureDate: string;
+  departureDateFrom: string;
+  departureDateTo: string;
   airlineCode: string | null;
-  flightNumber: string | null;
   cabinClass: CabinClass;
-  thresholdPrice: number;
+  phoneNumber: string;
+  phoneNumberMasked: string;
+  maxPriceIdr: number;
   isActive: boolean;
   lastCheckedAt: string | null;
   lastPriceSeen: number | null;
+  matchedDate: string | null;
   triggeredAt: string | null;
   createdAt: string;
 }
@@ -66,12 +69,12 @@ export interface Alert {
 export interface CreateAlertPayload {
   origin: string;
   destination: string;
-  departureDate: string;
+  departureDateFrom: string;
+  departureDateTo: string;
   airlineCode?: string;
-  flightNumber?: string;
   cabinClass: CabinClass;
-  thresholdPrice: number;
-  pushSubscription: PushSubscriptionJSON;
+  phoneNumber: string;
+  maxPriceIdr: number;
   clientId: string;
 }
 

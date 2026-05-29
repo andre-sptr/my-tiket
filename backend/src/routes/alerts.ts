@@ -1,23 +1,23 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
+import { normalizePhoneToE164, sendWhatsAppText, wahaEnabled } from '../services/waha';
 
-const CreateAlertSchema = z.object({
-  origin: z.string().length(3).toUpperCase(),
-  destination: z.string().length(3).toUpperCase(),
-  departureDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  airlineCode: z.string().optional(),
-  flightNumber: z.string().optional(),
-  cabinClass: z.enum(['ECONOMY', 'PREMIUM_ECONOMY', 'BUSINESS', 'FIRST']).default('ECONOMY'),
-  thresholdPrice: z.number().int().positive(),
-  pushSubscription: z.object({
-    endpoint: z.string().url(),
-    keys: z.object({
-      p256dh: z.string(),
-      auth: z.string(),
-    }),
-  }),
-  clientId: z.string().min(1).max(64),
-});
+const CreateAlertSchema = z
+  .object({
+    origin: z.string().length(3).toUpperCase(),
+    destination: z.string().length(3).toUpperCase(),
+    departureDateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    departureDateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    airlineCode: z.string().min(1).max(10).optional().nullable(),
+    cabinClass: z.enum(['ECONOMY', 'PREMIUM_ECONOMY', 'BUSINESS', 'FIRST']).default('ECONOMY'),
+    phoneNumber: z.string().min(8).max(20),
+    maxPriceIdr: z.number().int().positive(),
+    clientId: z.string().min(1).max(64),
+  })
+  .refine((d) => d.departureDateFrom <= d.departureDateTo, {
+    message: 'departureDateTo harus ≥ departureDateFrom',
+    path: ['departureDateTo'],
+  });
 
 export const alertsRouter: FastifyPluginAsync = async (fastify) => {
   // POST /api/alerts
@@ -27,37 +27,38 @@ export const alertsRouter: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ message: 'Data tidak valid', errors: body.error.flatten() });
     }
 
-    const { origin, destination, departureDate, airlineCode, flightNumber, cabinClass, thresholdPrice, pushSubscription, clientId } = body.data;
+    const {
+      origin,
+      destination,
+      departureDateFrom,
+      departureDateTo,
+      airlineCode,
+      cabinClass,
+      phoneNumber,
+      maxPriceIdr,
+      clientId,
+    } = body.data;
+
+    const phoneE164 = normalizePhoneToE164(phoneNumber);
+    if (phoneE164.length < 10 || phoneE164.length > 15) {
+      return reply.status(400).send({ message: 'Format nomor HP tidak valid' });
+    }
 
     const alert = await fastify.prisma.alert.create({
       data: {
         origin,
         destination,
-        departureDate: new Date(departureDate),
+        departureDateFrom: new Date(departureDateFrom),
+        departureDateTo: new Date(departureDateTo),
         airlineCode: airlineCode || null,
-        flightNumber: flightNumber || null,
         cabinClass,
-        thresholdPrice: BigInt(thresholdPrice),
-        pushSubscription,
+        phoneNumber: phoneE164,
+        maxPriceIdr: BigInt(maxPriceIdr),
         clientId,
       },
     });
 
-    return {
-      id: alert.id,
-      origin: alert.origin,
-      destination: alert.destination,
-      departureDate: alert.departureDate.toISOString().split('T')[0],
-      airlineCode: alert.airlineCode,
-      flightNumber: alert.flightNumber,
-      cabinClass: alert.cabinClass,
-      thresholdPrice: Number(alert.thresholdPrice),
-      isActive: alert.isActive,
-      lastCheckedAt: null,
-      lastPriceSeen: null,
-      triggeredAt: null,
-      createdAt: alert.createdAt.toISOString(),
-    };
+    return serializeAlert(alert);
   });
 
   // GET /api/alerts?clientId=xxx
@@ -72,21 +73,7 @@ export const alertsRouter: FastifyPluginAsync = async (fastify) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    return alerts.map((a) => ({
-      id: a.id,
-      origin: a.origin,
-      destination: a.destination,
-      departureDate: a.departureDate.toISOString().split('T')[0],
-      airlineCode: a.airlineCode,
-      flightNumber: a.flightNumber,
-      cabinClass: a.cabinClass,
-      thresholdPrice: Number(a.thresholdPrice),
-      isActive: a.isActive,
-      lastCheckedAt: a.lastCheckedAt?.toISOString() || null,
-      lastPriceSeen: a.lastPriceSeen ? Number(a.lastPriceSeen) : null,
-      triggeredAt: a.triggeredAt?.toISOString() || null,
-      createdAt: a.createdAt.toISOString(),
-    }));
+    return alerts.map(serializeAlert);
   });
 
   // DELETE /api/alerts/:id
@@ -99,4 +86,48 @@ export const alertsRouter: FastifyPluginAsync = async (fastify) => {
       return reply.status(404).send({ message: 'Alert tidak ditemukan' });
     }
   });
+
+  // POST /api/alerts/test-whatsapp — kirim pesan test, debug only
+  fastify.post('/alerts/test-whatsapp', async (req, reply) => {
+    const schema = z.object({ phoneNumber: z.string().min(8).max(20) });
+    const body = schema.safeParse(req.body);
+    if (!body.success) {
+      return reply.status(400).send({ message: 'phoneNumber required' });
+    }
+    if (!wahaEnabled) {
+      return reply.status(503).send({ message: 'WAHA tidak dikonfigurasi' });
+    }
+    const ok = await sendWhatsAppText(
+      body.data.phoneNumber,
+      'Test dari myTiket — WAHA terhubung. 🎫',
+    );
+    return { ok };
+  });
 };
+
+function maskPhone(phone: string): string {
+  // 6281234567890 → 628****7890
+  if (phone.length < 8) return phone;
+  return `${phone.slice(0, 3)}****${phone.slice(-4)}`;
+}
+
+function serializeAlert(a: any) {
+  return {
+    id: a.id,
+    origin: a.origin,
+    destination: a.destination,
+    departureDateFrom: a.departureDateFrom.toISOString().split('T')[0],
+    departureDateTo: a.departureDateTo.toISOString().split('T')[0],
+    airlineCode: a.airlineCode,
+    cabinClass: a.cabinClass,
+    phoneNumber: a.phoneNumber,
+    phoneNumberMasked: maskPhone(a.phoneNumber),
+    maxPriceIdr: Number(a.maxPriceIdr),
+    isActive: a.isActive,
+    lastCheckedAt: a.lastCheckedAt?.toISOString() || null,
+    lastPriceSeen: a.lastPriceSeen ? Number(a.lastPriceSeen) : null,
+    matchedDate: a.matchedDate ? a.matchedDate.toISOString().split('T')[0] : null,
+    triggeredAt: a.triggeredAt?.toISOString() || null,
+    createdAt: a.createdAt.toISOString(),
+  };
+}

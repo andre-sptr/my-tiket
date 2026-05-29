@@ -48,29 +48,30 @@ model PriceRecord {
 }
 
 model Alert {
-  id               String       @id @default(uuid())
-  // Target flight criteria
-  origin           String       @db.VarChar(3)
-  destination      String       @db.VarChar(3)
-  departureDate    DateTime     @db.Date
-  airlineCode      String?      @db.VarChar(10)  // null = semua maskapai
-  flightNumber     String?      @db.VarChar(10)  // null = semua flight
-  cabinClass       CabinClass   @default(ECONOMY)
-  // Threshold
-  thresholdPrice   BigInt
-  // Push
-  pushSubscription Json         // browser PushSubscription JSON
-  clientId         String       @db.VarChar(64)
+  id                  String       @id @default(uuid())
+  // Search criteria
+  origin              String       @db.VarChar(3)
+  destination         String       @db.VarChar(3)
+  departureDateFrom   DateTime     @db.Date
+  departureDateTo     DateTime     @db.Date
+  airlineCode         String?      @db.VarChar(10)  // null = semua maskapai
+  cabinClass          CabinClass   @default(ECONOMY)
+  // Notification (WhatsApp via WAHA)
+  phoneNumber         String       @db.VarChar(20)  // E.164: 62812xxxx
+  maxPriceIdr         BigInt
+  // Browser identity (anonymous user)
+  clientId            String       @db.VarChar(64)
   // Status
-  isActive         Boolean      @default(true)
-  lastCheckedAt    DateTime?
-  lastPriceSeen    BigInt?
-  triggeredAt      DateTime?
-  createdAt        DateTime     @default(now())
+  isActive            Boolean      @default(true)
+  lastCheckedAt       DateTime?
+  lastPriceSeen       BigInt?
+  matchedDate         DateTime?    @db.Date     // tanggal yg trigger alert
+  triggeredAt         DateTime?
+  createdAt           DateTime     @default(now())
 
-  notifications    NotificationLog[]
+  notifications       NotificationLog[]
 
-  @@index([isActive, departureDate])
+  @@index([isActive, departureDateFrom, departureDateTo])
   @@index([clientId])
   @@map("alerts")
 }

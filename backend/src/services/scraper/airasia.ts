@@ -1,7 +1,7 @@
 import { chromium } from 'playwright-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import type { Redis } from 'ioredis';
-import type { FlightOffer, SearchParams } from '../types';
+import type { CabinClass, FlightOffer, SearchParams } from '../types';
 
 chromium.use(StealthPlugin());
 

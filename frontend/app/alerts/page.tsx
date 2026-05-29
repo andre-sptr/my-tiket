@@ -2,19 +2,19 @@
 
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getAlertIds } from '@/lib/localStorage';
+import { getClientId } from '@/lib/localStorage';
 import { fetchAlerts, deleteAlert } from '@/lib/api';
 import AlertList from '@/components/AlertList';
-import { Bell, BellOff } from 'lucide-react';
+import AlertModal from '@/components/AlertModal';
+import { Bell, BellOff, Plus } from 'lucide-react';
 import type { Alert } from '@/lib/types';
 
 export default function AlertsPage() {
   const [clientId, setClientId] = useState<string>('');
+  const [showCreate, setShowCreate] = useState(false);
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    // clientId baru tersedia di client side
-    const { getClientId } = require('@/lib/localStorage');
     setClientId(getClientId());
   }, []);
 
@@ -36,9 +36,18 @@ export default function AlertsPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-8">
-      <div className="flex items-center gap-3">
-        <Bell className="w-6 h-6 text-brand-500" />
-        <h1 className="text-2xl font-bold">Alert Saya</h1>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <Bell className="w-6 h-6 text-brand-500" />
+          <h1 className="text-2xl font-bold">Alert Saya</h1>
+        </div>
+        <button
+          onClick={() => setShowCreate(true)}
+          className="inline-flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-lg px-4 py-2 text-sm transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          Buat Alert Baru
+        </button>
       </div>
 
       {isLoading && (
@@ -54,7 +63,7 @@ export default function AlertsPage() {
           <BellOff className="w-12 h-12 mx-auto text-gray-300" />
           <p className="text-gray-400">Belum ada alert aktif.</p>
           <p className="text-sm text-gray-400">
-            Cari tiket dan klik <strong>"Set Alert"</strong> untuk mulai memantau harga.
+            Klik <strong>"Buat Alert Baru"</strong> di atas untuk mulai memantau harga.
           </p>
         </div>
       )}
@@ -65,10 +74,7 @@ export default function AlertsPage() {
             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block" />
             Sedang Dipantau ({activeAlerts.length})
           </h2>
-          <AlertList
-            alerts={activeAlerts}
-            onDelete={(id) => deleteMutation.mutate(id)}
-          />
+          <AlertList alerts={activeAlerts} onDelete={(id) => deleteMutation.mutate(id)} />
         </section>
       )}
 
@@ -86,8 +92,10 @@ export default function AlertsPage() {
       )}
 
       <p className="text-xs text-gray-400 text-center">
-        Alert disimpan di browser ini. Pastikan notifikasi browser diizinkan agar bisa menerima peringatan.
+        Notifikasi dikirim via WhatsApp ke nomor yang Anda daftarkan saat membuat alert.
       </p>
+
+      {showCreate && <AlertModal onClose={() => setShowCreate(false)} />}
     </div>
   );
 }

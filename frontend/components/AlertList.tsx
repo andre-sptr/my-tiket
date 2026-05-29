@@ -1,6 +1,6 @@
 'use client';
 
-import { Trash2, Bell, CheckCircle2 } from 'lucide-react';
+import { Trash2, Bell, CheckCircle2, MessageCircle, Calendar } from 'lucide-react';
 import { formatIDR, formatShortDate } from '@/lib/format';
 import type { Alert } from '@/lib/types';
 
@@ -20,28 +20,45 @@ export default function AlertList({ alerts, onDelete, triggered = false }: Props
         >
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
-              <div className={`mt-0.5 p-2 rounded-lg ${triggered ? 'bg-green-100 dark:bg-green-900/30' : 'bg-brand-50 dark:bg-brand-900/30'}`}>
-                {triggered
-                  ? <CheckCircle2 className="w-4 h-4 text-green-500" />
-                  : <Bell className="w-4 h-4 text-brand-500 animate-pulse" />
-                }
+              <div
+                className={`mt-0.5 p-2 rounded-lg ${
+                  triggered ? 'bg-green-100 dark:bg-green-900/30' : 'bg-brand-50 dark:bg-brand-900/30'
+                }`}
+              >
+                {triggered ? (
+                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                ) : (
+                  <Bell className="w-4 h-4 text-brand-500 animate-pulse" />
+                )}
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1 min-w-0">
                 <div className="font-semibold text-sm">
                   {alert.origin} → {alert.destination}
                   {alert.airlineCode && (
                     <span className="ml-2 text-xs font-normal text-gray-400">
                       {alert.airlineCode}
-                      {alert.flightNumber && ` · ${alert.flightNumber}`}
                     </span>
                   )}
                 </div>
-                <div className="text-xs text-gray-400">
-                  {formatShortDate(alert.departureDate)} · {alert.cabinClass}
+                <div className="text-xs text-gray-400 flex items-center gap-1.5 flex-wrap">
+                  <Calendar className="w-3 h-3" />
+                  {formatShortDate(alert.departureDateFrom)}
+                  {alert.departureDateFrom !== alert.departureDateTo && (
+                    <> — {formatShortDate(alert.departureDateTo)}</>
+                  )}
+                  <span>·</span>
+                  <span>{alert.cabinClass.replace('_', ' ')}</span>
                 </div>
-                <div className="flex items-center gap-3 text-sm">
+                <div className="text-xs text-gray-400 flex items-center gap-1.5">
+                  <MessageCircle className="w-3 h-3" />
+                  {alert.phoneNumberMasked}
+                </div>
+                <div className="flex items-center gap-3 text-sm flex-wrap">
                   <span>
-                    Target: <span className="font-semibold text-brand-600">{formatIDR(alert.thresholdPrice)}</span>
+                    Target ≤{' '}
+                    <span className="font-semibold text-brand-600">
+                      {formatIDR(alert.maxPriceIdr)}
+                    </span>
                   </span>
                   {alert.lastPriceSeen && (
                     <span className="text-gray-400">
@@ -52,6 +69,9 @@ export default function AlertList({ alerts, onDelete, triggered = false }: Props
                 {triggered && alert.triggeredAt && (
                   <div className="text-xs text-green-500">
                     ✅ Terpicu {formatShortDate(alert.triggeredAt)}
+                    {alert.matchedDate && (
+                      <> · cocok untuk tgl {formatShortDate(alert.matchedDate)}</>
+                    )}
                   </div>
                 )}
                 {!triggered && alert.lastCheckedAt && (

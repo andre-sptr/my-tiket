@@ -1,6 +1,6 @@
 # ✈️ myTiket
 
-> Web app pemantau harga tiket pesawat — Amadeus API + LCC Scraper + Web Push Notification
+> Web app pemantau harga tiket pesawat — Duffel API + LCC Scraper + Web Push Notification
 
 **Live:** https://tiket.andresptr.site
 
@@ -15,12 +15,12 @@
 - PostgreSQL 14+ (install lokal atau pakai service)
 - Redis 6+ (install lokal atau pakai service)
 - PM2 (untuk production): `npm install -g pm2`
-- Amadeus API key (daftar gratis di https://developers.amadeus.com)
+- Duffel API token (opsional di dev — daftar gratis di https://duffel.com)
 
 ### 1. Setup environment
 ```bash
 cp backend/.env.example backend/.env
-# Edit backend/.env: isi AMADEUS_CLIENT_ID (opsional), DATABASE_URL, REDIS_URL
+# Edit backend/.env: isi DUFFEL_ACCESS_TOKEN (opsional), DATABASE_URL, REDIS_URL
 ```
 
 ### 2. Pastikan Postgres + Redis jalan
@@ -66,9 +66,7 @@ npm run dev
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `AMADEUS_CLIENT_ID` | ✅ | Dari Amadeus Developer Portal |
-| `AMADEUS_CLIENT_SECRET` | ✅ | Dari Amadeus Developer Portal |
-| `AMADEUS_HOSTNAME` | ✅ | `test` atau `production` |
+| `DUFFEL_ACCESS_TOKEN` | ⚪ | Dari [duffel.com](https://duffel.com) → Dashboard → Developer → Access tokens. Format: `duffel_test_xxx` (sandbox gratis) atau `duffel_live_xxx` |
 | `DATABASE_URL` | ✅ | PostgreSQL: `postgresql://user:pass@localhost:5432/mytiket` |
 | `REDIS_URL` | ✅ | Redis: `redis://localhost:6379` |
 | `VAPID_PUBLIC_KEY` | ✅ | Generate: `npm run vapid:generate` |
@@ -98,11 +96,11 @@ myTiket/
 
 | Maskapai | Sumber | Kode |
 |----------|--------|------|
-| Garuda Indonesia | Amadeus GDS | GA |
-| Batik Air | Amadeus GDS | ID |
-| Singapore Airlines | Amadeus GDS | SQ |
-| Malaysia Airlines | Amadeus GDS | MH |
-| AirAsia (GDS) | Amadeus GDS | QZ |
+| Garuda Indonesia | Duffel API | GA |
+| Batik Air | Duffel API | ID |
+| Singapore Airlines | Duffel API | SQ |
+| Malaysia Airlines | Duffel API | MH |
+| AirAsia (GDS) | Duffel API | QZ |
 | **Lion Air** | Web Scraper | JT |
 | **Citilink** | Web Scraper | QG |
 | **AirAsia Indonesia** | Web Scraper | QZ |

@@ -3,7 +3,7 @@ import { Redis } from 'ioredis';
 import { PrismaClient } from '@prisma/client';
 import { DuffelService } from '../services/duffel';
 import { ScraperService } from '../services/scraper/index';
-import { sendPushNotification } from '../services/webpush';
+import { sendWhatsAppText } from '../services/waha';
 import { formatIDR } from '../utils/format';
 
 const QUEUE_NAME = 'price-checker';
@@ -11,6 +11,8 @@ const QUEUE_NAME = 'price-checker';
 // Bisa di-override via env CHECK_INTERVAL_MIN
 const CHECK_INTERVAL_MS =
   Number(process.env.CHECK_INTERVAL_MIN || 120) * 60 * 1000;
+
+const LCC_CODES = ['JT', 'QG', 'QZ', 'IU'] as const;
 
 let queue: Queue;
 
@@ -25,185 +27,251 @@ export function startAlertWorker() {
 
   queue = new Queue(QUEUE_NAME, { connection: redis });
 
-  // Tambahkan repeatable job (idempotent — hanya 1 job aktif)
-  queue.add('check-all-alerts', {}, {
-    repeat: { every: CHECK_INTERVAL_MS },
-    jobId: 'check-all-alerts-recurring',
-  });
+  // Repeatable job — idempotent
+  queue.add(
+    'check-all-alerts',
+    {},
+    {
+      repeat: { every: CHECK_INTERVAL_MS },
+      jobId: 'check-all-alerts-recurring',
+    },
+  );
 
-  const worker = new Worker(QUEUE_NAME, async (job: Job) => {
-    if (job.name !== 'check-all-alerts') return;
+  const worker = new Worker(
+    QUEUE_NAME,
+    async (job: Job) => {
+      if (job.name !== 'check-all-alerts') return;
 
-    console.log('[AlertWorker] Starting price check run...');
+      console.log('[AlertWorker] Starting price check run...');
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
-    // Load semua alert aktif yang departure_date >= hari ini
-    const alerts = await prisma.alert.findMany({
-      where: {
-        isActive: true,
-        departureDate: { gte: today },
-      },
-    });
+      // Load alert aktif yang range tanggalnya masih relevan
+      const alerts = await prisma.alert.findMany({
+        where: {
+          isActive: true,
+          departureDateTo: { gte: today },
+        },
+      });
 
-    console.log(`[AlertWorker] Checking ${alerts.length} active alerts`);
+      console.log(`[AlertWorker] Checking ${alerts.length} active alerts`);
 
-    // Group by origin+destination+date untuk batching
-    const groups = new Map<string, typeof alerts>();
-    for (const alert of alerts) {
-      const key = `${alert.origin}:${alert.destination}:${alert.departureDate.toISOString().split('T')[0]}`;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(alert);
-    }
+      // Group by origin+destination biar share API call lintas alert
+      const groups = new Map<string, typeof alerts>();
+      for (const alert of alerts) {
+        const key = `${alert.origin}:${alert.destination}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(alert);
+      }
 
-    for (const [, groupAlerts] of groups) {
-      const representative = groupAlerts[0];
-      const dateStr = representative.departureDate.toISOString().split('T')[0];
+      for (const [, groupAlerts] of groups) {
+        const representative = groupAlerts[0];
 
-      // Delay sopan antar grup (scraper tidak ditimpa)
-      await sleep(500 + Math.random() * 500);
+        // Kumpulkan semua tanggal unik yang perlu dicek dari semua alert di grup
+        const datesToCheck = new Set<string>();
+        for (const a of groupAlerts) {
+          for (const d of enumerateDates(a.departureDateFrom, a.departureDateTo, today)) {
+            datesToCheck.add(d);
+          }
+        }
 
-      // Tentukan sumber per maskapai di grup ini
-      const airlineCodes = [...new Set(groupAlerts.map((a) => a.airlineCode).filter(Boolean) as string[])];
-      const lccCodes = airlineCodes.filter((c) => ['JT', 'QG', 'QZ', 'IU'].includes(c));
-      const fullServiceAirlines = airlineCodes.filter((c) => !['JT', 'QG', 'QZ', 'IU'].includes(c));
+        // Untuk tiap tanggal, fetch harga dari Duffel + scraper, simpan ke priceMap
+        // priceMap: tanggal → (airlineCode → lowestPrice)
+        const priceMap = new Map<string, Map<string, number>>();
 
-      // Fetch current prices
-      const currentPrices = new Map<string, number>(); // airlineCode → lowestPrice
+        for (const dateStr of datesToCheck) {
+          await sleep(500 + Math.random() * 500); // sopan antar tanggal
 
-      // Duffel (full-service)
-      if (fullServiceAirlines.length > 0 || airlineCodes.length === 0) {
-        try {
-          const offers = await duffelService.searchFlights({
-            origin: representative.origin,
-            destination: representative.destination,
-            date: dateStr,
-            adults: 1,
-            cabin: representative.cabinClass,
-          });
-          for (const offer of offers) {
-            const existing = currentPrices.get(offer.airline.code);
-            if (!existing || offer.priceIdr < existing) {
-              currentPrices.set(offer.airline.code, offer.priceIdr);
+          const datePrices = new Map<string, number>();
+
+          // Duffel (full-service)
+          try {
+            const offers = await duffelService.searchFlights({
+              origin: representative.origin,
+              destination: representative.destination,
+              date: dateStr,
+              adults: 1,
+              cabin: representative.cabinClass,
+            });
+            for (const offer of offers) {
+              const existing = datePrices.get(offer.airline.code);
+              if (!existing || offer.priceIdr < existing) {
+                datePrices.set(offer.airline.code, offer.priceIdr);
+              }
+            }
+          } catch (err) {
+            console.warn('[AlertWorker] Duffel fetch error:', (err as Error).message);
+          }
+          await sleep(300);
+
+          // LCC scrapers (semua, mahal — tapi worker jalan tiap 2 jam saja)
+          for (const code of LCC_CODES) {
+            try {
+              const price = await scraperService.getLatestPrice(
+                code,
+                representative.origin,
+                representative.destination,
+                dateStr,
+              );
+              if (price) datePrices.set(code, price);
+            } catch {
+              // skip per-airline scraper failure
+            }
+            await sleep(2000); // sopan ke LCC site
+          }
+
+          priceMap.set(dateStr, datePrices);
+        }
+
+        // Evaluasi tiap alert di grup
+        for (const alert of groupAlerts) {
+          let bestPrice: number | null = null;
+          let bestDate: string | null = null;
+          let bestAirline: string | null = null;
+
+          for (const d of enumerateDates(alert.departureDateFrom, alert.departureDateTo, today)) {
+            const datePrices = priceMap.get(d);
+            if (!datePrices) continue;
+
+            // Tentukan harga relevan untuk alert ini di tanggal d
+            let candidate: { code: string; price: number } | null = null;
+            if (alert.airlineCode) {
+              const p = datePrices.get(alert.airlineCode);
+              if (p !== undefined) candidate = { code: alert.airlineCode, price: p };
+            } else {
+              // Semua maskapai → ambil minimum
+              for (const [code, p] of datePrices) {
+                if (!candidate || p < candidate.price) candidate = { code, price: p };
+              }
+            }
+
+            if (candidate && (bestPrice === null || candidate.price < bestPrice)) {
+              bestPrice = candidate.price;
+              bestDate = d;
+              bestAirline = candidate.code;
             }
           }
-        } catch (err) {
-          console.warn('[AlertWorker] Duffel fetch error:', (err as Error).message);
-        }
-        await sleep(300); // rate limiting Duffel
-      }
 
-      // LCC scrapers
-      for (const code of lccCodes) {
-        try {
-          const price = await scraperService.getLatestPrice(
-            code, representative.origin, representative.destination, dateStr
-          );
-          if (price) currentPrices.set(code, price);
-        } catch {
-          // ignore scraper failure per airline
-        }
-        await sleep(2000); // sopan ke LCC site
-      }
+          // Update last seen
+          if (bestPrice !== null) {
+            await prisma.alert.update({
+              where: { id: alert.id },
+              data: {
+                lastCheckedAt: new Date(),
+                lastPriceSeen: BigInt(bestPrice),
+              },
+            });
+          } else {
+            await prisma.alert.update({
+              where: { id: alert.id },
+              data: { lastCheckedAt: new Date() },
+            });
+          }
 
-      // Cek setiap alert dalam grup
-      for (const alert of groupAlerts) {
-        // Tentukan harga yang relevan untuk alert ini
-        let currentPrice: number | null = null;
-
-        if (alert.airlineCode) {
-          currentPrice = currentPrices.get(alert.airlineCode) ?? null;
-        } else {
-          // semua maskapai — ambil minimum
-          const allPrices = Array.from(currentPrices.values());
-          currentPrice = allPrices.length > 0 ? Math.min(...allPrices) : null;
-        }
-
-        // Update last seen
-        if (currentPrice !== null) {
-          await prisma.alert.update({
-            where: { id: alert.id },
-            data: {
-              lastCheckedAt: new Date(),
-              lastPriceSeen: BigInt(currentPrice),
-            },
-          });
-        }
-
-        // Cek threshold
-        if (currentPrice !== null && currentPrice <= Number(alert.thresholdPrice)) {
-          console.log(`[AlertWorker] Alert ${alert.id} triggered! ${currentPrice} ≤ ${alert.thresholdPrice}`);
-          await triggerAlert(prisma, alert, currentPrice);
+          // Cek threshold
+          if (
+            bestPrice !== null &&
+            bestDate &&
+            bestAirline &&
+            bestPrice <= Number(alert.maxPriceIdr)
+          ) {
+            console.log(
+              `[AlertWorker] Alert ${alert.id} TRIGGERED — ${bestAirline} ${bestDate} ${bestPrice} ≤ ${alert.maxPriceIdr}`,
+            );
+            await triggerAlert(prisma, alert, bestAirline, bestDate, bestPrice);
+          }
         }
       }
-    }
 
-    console.log('[AlertWorker] Price check run complete.');
-  }, {
-    connection: redis,
-    concurrency: 1,
-  });
+      console.log('[AlertWorker] Price check run complete.');
+    },
+    {
+      connection: redis,
+      concurrency: 1,
+    },
+  );
 
   worker.on('error', (err) => console.error('[AlertWorker] Worker error:', err));
-  worker.on('failed', (job, err) => console.error(`[AlertWorker] Job ${job?.id} failed:`, err));
+  worker.on('failed', (job, err) =>
+    console.error(`[AlertWorker] Job ${job?.id} failed:`, err),
+  );
 
   console.log(`✅ Alert worker started (checks every ${CHECK_INTERVAL_MS / 60000} min)`);
 }
 
-async function triggerAlert(prisma: PrismaClient, alert: any, price: number) {
-  const sub = alert.pushSubscription as any;
+async function triggerAlert(
+  prisma: PrismaClient,
+  alert: any,
+  airlineCode: string,
+  dateStr: string,
+  price: number,
+) {
+  const dateObj = new Date(dateStr);
+  const text =
+    `🎫 *Harga Tiket Turun!*\n\n` +
+    `${alert.origin} → ${alert.destination}\n` +
+    `Maskapai: *${airlineCode}*\n` +
+    `Tanggal: *${formatDate(dateObj)}*\n` +
+    `Harga: *${formatIDR(price)}*\n` +
+    `Target Anda: ${formatIDR(Number(alert.maxPriceIdr))}\n\n` +
+    `Cek sekarang: https://www.google.com/travel/flights?q=${airlineCode}+flights+${alert.origin}+${alert.destination}+${dateStr}\n\n` +
+    `Alert ini akan otomatis nonaktif. Set lagi kalau perlu pantau ulang.`;
 
-  const payload = {
-    title: '🎫 Harga Tiket Turun!',
-    body: `${alert.airlineCode || 'Tiket'} ${alert.origin}→${alert.destination} ${formatDate(alert.departureDate)}: ${formatIDR(price)}`,
-    url: `/search?origin=${alert.origin}&destination=${alert.destination}&date=${alert.departureDate.toISOString().split('T')[0]}&adults=1&cabin=${alert.cabinClass}`,
-    alertId: alert.id,
-  };
+  const sent = await sendWhatsAppText(alert.phoneNumber, text);
 
-  let success = false;
-  try {
-    success = await sendPushNotification(sub as webpush.PushSubscription, payload);
-  } catch {
-    success = false;
-  }
-
-  // Log notification
   await prisma.notificationLog.create({
     data: {
       alertId: alert.id,
-      source: alert.airlineCode ? mapSource(alert.airlineCode) : 'DUFFEL',
+      source: mapSource(airlineCode),
       priceTriggered: BigInt(price),
-      success,
+      flightNumber: null,
+      success: sent,
+      errorMessage: sent ? null : 'WAHA send failed',
     },
   });
 
-  // Deactivate alert
   await prisma.alert.update({
     where: { id: alert.id },
-    data: { isActive: false, triggeredAt: new Date() },
+    data: {
+      isActive: false,
+      triggeredAt: new Date(),
+      matchedDate: dateObj,
+    },
   });
+}
+
+/** Iterate semua tanggal di [from, to] sebagai YYYY-MM-DD, mulai dari max(from, today). */
+function* enumerateDates(from: Date, to: Date, today: Date): Generator<string> {
+  const start = from < today ? today : from;
+  const cur = new Date(start);
+  cur.setHours(0, 0, 0, 0);
+  const end = new Date(to);
+  end.setHours(0, 0, 0, 0);
+  while (cur <= end) {
+    yield cur.toISOString().split('T')[0];
+    cur.setDate(cur.getDate() + 1);
+  }
 }
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function formatIDR(amount: number): string {
-  return new Intl.NumberFormat('id-ID', {
-    style: 'currency', currency: 'IDR',
-    minimumFractionDigits: 0, maximumFractionDigits: 0,
-  }).format(amount);
-}
-
 function formatDate(date: Date): string {
-  return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+  return date.toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
 }
 
 function mapSource(code: string): 'DUFFEL' | 'LIONAIR' | 'CITILINK' | 'AIRASIA' | 'SUPERAIRJET' {
-  const map: Record<string, any> = { JT: 'LIONAIR', QG: 'CITILINK', QZ: 'AIRASIA', IU: 'SUPERAIRJET' };
+  const map: Record<string, any> = {
+    JT: 'LIONAIR',
+    QG: 'CITILINK',
+    QZ: 'AIRASIA',
+    IU: 'SUPERAIRJET',
+  };
   return map[code] || 'DUFFEL';
 }
-
-// dummy import untuk webpush (resolved di runtime)
-import webpush from 'web-push';
